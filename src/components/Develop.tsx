@@ -3,10 +3,11 @@ import { buzz, requestMotionPermission, useShake } from '../lib/motion'
 import { playReveal } from '../lib/sound'
 import { FRAMES, type Frame } from '../lib/types'
 import { frameClass } from '../lib/frame'
+import { makePreview } from '../lib/preview'
 
 interface Props {
   file: File
-  onPost: (caption: string, frame: Frame) => void
+  onPost: (caption: string, frame: Frame, preview: string) => void
   onDiscard: () => void
 }
 
@@ -20,16 +21,33 @@ let motionAllowed = !needsMotionPrompt
 
 /** The moment after the shutter: the shot zooms out into a dark Polaroid and develops on shake or hold. */
 export function Develop({ file, onPost, onDiscard }: Props) {
-  const [url] = useState(() => URL.createObjectURL(file))
+  const [url, setUrl] = useState<string>()
   const [stage, setStage] = useState<Stage>('zoom')
-  const [progress, setProgress] = useState(0)
+  // progress lives in a ref and a CSS variable: re-rendering React on every frame of a hold drops frames
+  const progress = useRef(0)
+  const [shown, setShown] = useState(0)
+  const root = useRef<HTMLDivElement>(null)
+  const posted = useRef(false)
   const [caption, setCaption] = useState('')
   const [frame, setFrame] = useState<Frame>('classic')
   const [canShake, setCanShake] = useState(motionAllowed)
   const holding = useRef(false)
   const raf = useRef(0)
 
-  useEffect(() => () => URL.revokeObjectURL(url), [url])
+  useEffect(() => {
+    let live = true
+    let made: string | undefined
+    makePreview(file).then((u) => {
+      made = u
+      if (live) setUrl(u)
+      else URL.revokeObjectURL(u)
+    })
+    return () => {
+      live = false
+      // a posted preview now belongs to the feed
+      if (made && !posted.current) URL.revokeObjectURL(made)
+    }
+  }, [file])
 
   useEffect(() => {
     const t = setTimeout(() => setStage('develop'), 900)
@@ -37,17 +55,19 @@ export function Develop({ file, onPost, onDiscard }: Props) {
   }, [])
 
   const advance = useCallback((amount: number) => {
-    setProgress((p) => Math.min(1, p + amount))
-  }, [])
-
-  useEffect(() => {
-    if (stage === 'develop' && progress >= 1) {
+    if (progress.current >= 1) return
+    const p = Math.min(1, progress.current + amount)
+    progress.current = p
+    root.current?.style.setProperty('--p', String(p))
+    // only re-render for the screen-reader label, in 10% steps
+    setShown(Math.floor(p * 10) / 10)
+    if (p >= 1) {
       holding.current = false
       setStage('done')
       buzz([30, 40, 80])
       playReveal()
     }
-  }, [progress, stage])
+  }, [])
 
   useShake(
     (strength) => {
@@ -58,7 +78,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
   )
 
   const startHold = () => {
-    if (stage !== 'develop') return
+    if (stage !== 'develop' || holding.current) return
     holding.current = true
     let last = performance.now()
     const tick = (now: number) => {
@@ -84,7 +104,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
   }
 
   return (
-    <div className={`develop stage-${stage}`} style={{ '--p': progress } as React.CSSProperties}>
+    <div ref={root} className={`develop stage-${stage}`} style={{ '--p': 0 } as React.CSSProperties}>
       <div className="develop-flash" aria-hidden />
       <div className="develop-hint">
         {stage === 'done' ? (
@@ -105,7 +125,13 @@ export function Develop({ file, onPost, onDiscard }: Props) {
         onContextMenu={(e) => e.preventDefault()}
       >
         <div className="polaroid-photo">
-          <img src={url} alt="Sua foto" draggable={false} />
+          {url && (
+            <>
+              {/* blurred print underneath, sharp print fading in on top: only opacity changes per frame */}
+              <img className="develop-blur" src={url} alt="" draggable={false} />
+              <img className="develop-sharp" src={url} alt="Sua foto" draggable={false} />
+            </>
+          )}
           <div className="develop-veil" aria-hidden />
         </div>
         <figcaption>
@@ -120,8 +146,8 @@ export function Develop({ file, onPost, onDiscard }: Props) {
               onPointerDown={(e) => e.stopPropagation()}
             />
           ) : (
-            <span className="develop-meter" aria-label={`Revelando ${Math.round(progress * 100)}%`}>
-              <span style={{ width: `${progress * 100}%` }} />
+            <span className="develop-meter" aria-label={`Revelando ${Math.round(shown * 100)}%`}>
+              <span />
             </span>
           )}
         </figcaption>
@@ -139,7 +165,11 @@ export function Develop({ file, onPost, onDiscard }: Props) {
               ))}
             </div>
             <button className="btn ghost" onClick={onDiscard}>Descartar</button>
-            <button className="btn primary" onClick={() => onPost(caption.trim(), frame)}>Postar no feed</button>
+            <button className="btn primary" onClick={() => {
+                if (!url) return
+                posted.current = true
+                onPost(caption.trim(), frame, url)
+              }}>Postar no feed</button>
           </>
         ) : (
           <>

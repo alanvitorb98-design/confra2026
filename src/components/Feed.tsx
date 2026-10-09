@@ -56,10 +56,11 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
         y: depth * 14,
         scale: 1 - depth * 0.05,
         rotate: depth === 0 ? photo.tilt : photo.tilt * (depth % 2 ? -1.8 : 1.8),
-        filter: `brightness(${1 - depth * 0.2})`,
       }}
       transition={spring}
     >
+      {/* dim the cards behind with an overlay: animating filter repaints the whole card every frame */}
+      <motion.span className="stack-shade" aria-hidden initial={false} animate={{ opacity: depth * 0.2 }} transition={spring} />
       <motion.div
         className={isTop ? 'stack-drag' : undefined}
         style={{ x, rotate }}
@@ -73,7 +74,7 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
       >
         <PolaroidFrame frame={photo.frame}>
           <div className="polaroid-photo">
-            {photo.url ? <img src={photo.url} alt={photo.caption || `Foto de ${photo.author}`} draggable={false} /> : <span className="ph" style={{ background: photo.placeholder }} />}
+            {photo.url ? <img src={photo.preview ?? photo.url} alt={photo.caption || `Foto de ${photo.author}`} draggable={false} /> : <span className="ph" style={{ background: photo.placeholder }} />}
             <span className="stamp">'26 11 07 · {time(photo.takenAt)}</span>
             {isTop && burst > 0 && (
               <motion.span
@@ -152,7 +153,7 @@ export function Feed({ photos, onReact, onOpen }: Props) {
             >
               <PolaroidFrame frame={p.frame}>
                 <span className="polaroid-photo">
-                  {p.url ? <img src={p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" /> : <span className="ph" style={{ background: p.placeholder }} />}
+                  {p.url ? <img src={p.preview ?? p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" /> : <span className="ph" style={{ background: p.placeholder }} />}
                   <span className="stamp">{time(p.takenAt)}</span>
                 </span>
                 <figcaption>{p.caption || '\u00a0'}</figcaption>
