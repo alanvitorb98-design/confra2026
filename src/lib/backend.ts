@@ -197,6 +197,13 @@ export type LiveState = 'loading' | 'live' | 'offline'
  * The whole party, live: photos, looks and reactions from everyone, kept in sync over a realtime channel.
  * Only signed-in guests can read; writes go through database functions that check who is calling.
  */
+/** Stable pseudo-random number for a string (FNV-1a), for per-guest shuffles */
+function seeded(text: string) {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193)
+  return h >>> 0
+}
+
 export function useParty(me: Guest | null) {
   const [guests, setGuests] = useState<Map<string, string>>(new Map())
   const [rows, setRows] = useState<Map<string, PhotoRow>>(new Map())
@@ -393,7 +400,11 @@ export function useParty(me: Guest | null) {
     }
     for (const l of local.values()) if (l.row.mission_id && l.status !== 'failed') done.add(l.row.mission_id)
     const value = new Map(missionRows.map((m) => [m.id, m.points]))
-    const missions: Mission[] = missionRows.filter((m) => m.active || done.has(m.id)).map((m) => ({ id: m.id, title: m.title, points: m.points, done: done.has(m.id) }))
+    // each guest gets the missions in their own random order, the same on every load (seeded by their id)
+    const missions: Mission[] = missionRows
+      .filter((m) => m.active || done.has(m.id))
+      .map((m) => ({ id: m.id, title: m.title, points: m.points, done: done.has(m.id) }))
+      .sort((a, b) => seeded(`${me?.id}:${a.id}`) - seeded(`${me?.id}:${b.id}`))
     const points = [...byGuest]
       .map(([g, set]) => ({ name: guests.get(g) ?? 'Convidado', value: [...set].reduce((a, id) => a + (value.get(id) ?? 0), 0) }))
       .filter((e) => e.value > 0)
