@@ -3,7 +3,8 @@ import type { Mission } from '../lib/types'
 
 interface Props {
   missions: Mission[]
-  onShoot: () => void
+  /** opens the camera; the photo counts for that mission */
+  onShoot: (missionId: string) => void
   /** missions only run while the party is on */
   locked: boolean
   phase: Phase
@@ -34,13 +35,14 @@ export function Missions({ missions, onShoot, locked, phase }: Props) {
     <div className="page">
       <h2 className="page-title">Missões</h2>
       <p className="page-lead">Novas missões chegam durante a festa. Cumpra tirando a foto pedida.</p>
+      {missions.length === 0 && <p className="page-note">Nenhuma missão no ar agora. Fica de olho!</p>}
       <ul className="missions">
         {open.map((m, i) => (
           <li key={m.id} className={`mission${i === 0 ? ' hot' : ''}`}>
             {i === 0 && <span className="mission-badge">Surpresa</span>}
             <span className="mission-title">{m.title}</span>
             <span className="mission-pts">+{m.points}</span>
-            {i === 0 && <button className="btn primary small" onClick={onShoot}>Tirar a foto</button>}
+            <button className={`btn ${i === 0 ? 'primary' : 'ghost'} small`} onClick={() => onShoot(m.id)}>Tirar a foto</button>
           </li>
         ))}
         {done.map((m) => (

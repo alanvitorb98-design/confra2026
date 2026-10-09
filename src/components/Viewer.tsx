@@ -7,7 +7,15 @@ import type { Photo } from '../lib/types'
 const size = (bytes: number) =>
   bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB` : `${Math.ceil(bytes / 1024)} KB`
 
-export function Viewer({ photo, onClose }: { photo: Photo; onClose: () => void }) {
+interface Props {
+  photo: Photo
+  onClose: () => void
+  /** the author or an organizer */
+  canRemove?: boolean
+  onRemove?: () => Promise<void>
+}
+
+export function Viewer({ photo, onClose, canRemove, onRemove }: Props) {
   const [status, setStatus] = useState<string>()
 
   const [busy, setBusy] = useState(false)
@@ -42,6 +50,15 @@ export function Viewer({ photo, onClose }: { photo: Photo; onClose: () => void }
             <button className="btn primary small" disabled={busy} onClick={() => run(async () => shareOrDownload(await makeStory(photo)))}>
               {busy ? 'Montando…' : 'Postar no Story'}
             </button>
+            {canRemove && onRemove && (
+              <button
+                className="btn ghost small danger"
+                disabled={busy}
+                onClick={() => confirm('Apagar essa foto pra todo mundo?') && run(async () => { await onRemove(); return 'cancelled' })}
+              >
+                Apagar
+              </button>
+            )}
             {status && <span className="viewer-status">{status}</span>}
           </div>
         ) : (

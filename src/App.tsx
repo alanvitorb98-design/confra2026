@@ -7,8 +7,8 @@ import { Profile } from './components/Profile'
 import { Ranking } from './components/Ranking'
 import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
-import { exampleAppearances, exampleMissions, examplePoints } from './lib/mock'
-import { eventCode, hasSession, join, leave, useParty } from './lib/backend'
+import { AdminPanel } from './components/AdminPanel'
+import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
@@ -49,6 +49,21 @@ export default function App() {
   const phase = phaseAt(t)
   const party = useParty(guest && phase !== 'countdown' ? guest : null)
   const photos = party.photos
+  const [, setConfigLoaded] = useState(0)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [panel, setPanel] = useState(false)
+  // which mission the photo being taken is for
+  const [missionShot, setMissionShot] = useState<string>()
+
+  // the organizer's dates and place: before login only with the invitation code
+  useEffect(() => {
+    loadEvent(code).then((ok) => ok && setConfigLoaded((n) => n + 1))
+  }, [code])
+
+  useEffect(() => {
+    if (guest) amAdmin().then(setIsAdmin)
+    else setIsAdmin(false)
+  }, [guest])
 
   // the browser can clear the login: then the guest signs in again with the code
   useEffect(() => {
@@ -83,12 +98,22 @@ export default function App() {
   const looksOpen = lookOpen(t)
   const shootKind: Wall = phase === 'look' || (looksOpen && showWall === 'look' && tab === 'feed') ? 'look' : 'party'
 
-  const shoot = () => canShoot && camera.current?.click()
+  const go = (next: Tab) => {
+    setPanel(false)
+    setTab(next)
+  }
+
+  const shoot = (missionId?: string) => {
+    if (!canShoot) return
+    setMissionShot(phase === 'party' ? missionId : undefined)
+    camera.current?.click()
+  }
 
   const post = (caption: string, frame: Frame, preview: string) => {
     if (!shot) return
     // the untouched original File goes up as is: no resizing or recompression anywhere
-    party.post(shot, preview, shootKind, caption, frame)
+    party.post(shot, preview, shootKind, caption, frame, missionShot)
+    setMissionShot(undefined)
     setWall(shootKind)
     setShot(null)
     setTab('feed')
@@ -128,6 +153,10 @@ export default function App() {
       <PhaseBar phase={phase} now={t} test={testClock} />
 
       <main>
+        {panel && isAdmin ? (
+          <AdminPanel missions={party.allMissions} onClose={() => setPanel(false)} />
+        ) : (
+        <>
         {tab === 'feed' && (
           <Feed
             key={showWall}
@@ -146,13 +175,20 @@ export default function App() {
             }
           />
         )}
-        {tab === 'missions' && <Missions missions={exampleMissions} onShoot={shoot} locked={phase !== 'party'} phase={phase} />}
-        {tab === 'ranking' && <Ranking points={examplePoints} appearances={exampleAppearances} looks={bestLooks} />}
+        {tab === 'missions' && <Missions missions={party.missions} onShoot={shoot} locked={phase !== 'party'} phase={phase} />}
+        {tab === 'ranking' && <Ranking points={party.points} appearances={[]} looks={bestLooks} />}
         {tab === 'me' && (
           <Profile
             guest={guest}
+            isAdmin={isAdmin}
+            onPanel={() => setPanel(true)}
+            onClaim={async (c: string) => {
+              const ok = await claimAdmin(c)
+              if (ok) setIsAdmin(true)
+              return ok
+            }}
             myPhotos={myPhotos}
-            points={0}
+            points={party.points.find((e) => e.name === guest.name)?.value ?? 0}
             onLeave={() => {
               try { localStorage.removeItem(GUEST_KEY) } catch { /* ignore */ }
               void leave()
@@ -160,14 +196,16 @@ export default function App() {
             }}
           />
         )}
+        </>
+        )}
       </main>
 
       <nav className="tabbar">
-        <button aria-current={tab === 'feed'} onClick={() => setTab('feed')}>Feed</button>
-        <button aria-current={tab === 'missions'} onClick={() => setTab('missions')}>Missões</button>
-        <button className="shutter" onClick={shoot} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
-        <button aria-current={tab === 'ranking'} onClick={() => setTab('ranking')}>Ranking</button>
-        <button aria-current={tab === 'me'} onClick={() => setTab('me')}>Eu</button>
+        <button aria-current={tab === 'feed'} onClick={() => go('feed')}>Feed</button>
+        <button aria-current={tab === 'missions'} onClick={() => go('missions')}>Missões</button>
+        <button className="shutter" onClick={() => shoot()} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
+        <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}>Ranking</button>
+        <button aria-current={tab === 'me'} onClick={() => go('me')}>Eu</button>
       </nav>
 
       <input
@@ -187,7 +225,17 @@ export default function App() {
       />
 
       {shot && <Develop key={shot.name + shot.lastModified} file={shot} postLabel={shootKind === 'look' ? 'Postar meu look' : 'Postar no feed'} onPost={post} onDiscard={() => setShot(null)} />}
-      {open && <Viewer photo={open} onClose={() => setOpen(null)} />}
+      {open && (
+        <Viewer
+          photo={open}
+          canRemove={open.authorId === guest.id || isAdmin}
+          onRemove={async () => {
+            await party.hide(open.id)
+            setOpen(null)
+          }}
+          onClose={() => setOpen(null)}
+        />
+      )}
     </div>
   )
 }
