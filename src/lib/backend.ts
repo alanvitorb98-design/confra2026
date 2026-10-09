@@ -23,8 +23,22 @@ let r2Ready: Promise<boolean> | null = null
 const r2On = () =>
   (r2Ready ??= fetch(`${R2_FN}?op=status`)
     .then((r) => r.json())
-    .then((j: { ready?: boolean }) => !!j.ready)
-    .catch(() => false))
+    .then((j: { ready?: boolean }) => {
+      // a "no" is asked again next time: it may just have been a bad connection
+      if (!j.ready) r2Ready = null
+      return !!j.ready
+    })
+    .catch((e) => {
+      r2Ready = null
+      note('r2 status', e)
+      return false
+    }))
+
+/** Tells the server which upload step failed on this phone (text only), to fix problems before the party. */
+function note(step: string, e: unknown) {
+  const why = e instanceof Error ? `${e.name}: ${e.message}` : ((e as { message?: string })?.message ?? String(e))
+  db.rpc('log_client_error', { p_note: `${step}: ${why}`.slice(0, 300), p_ua: navigator.userAgent.slice(0, 200) }).then(() => undefined, () => undefined)
+}
 
 /** Asks the r2 function for a 10-minute link to put or get one original */
 async function r2Link(op: 'put' | 'get', path: string) {
@@ -508,7 +522,10 @@ export function useParty(me: Guest | null) {
       const up = async (path: string, body: Blob, type: string) => {
         const { error } = await db.storage.from(BUCKET).upload(path, body, { contentType: type, cacheControl: '31536000', upsert: false })
         // a retry after a half-finished attempt finds the file already there
-        if (error && !/exists|Duplicate/i.test(error.message)) throw error
+        if (error && !/exists|Duplicate/i.test(error.message)) {
+          note(`upload ${path.endsWith('-p.jpg') ? 'preview' : 'original'}`, error)
+          throw error
+        }
       }
       await up(row.preview_path, previewBlob, 'image/jpeg')
       // party photos also get a 1600px copy for the face server, deleted after it is read
@@ -519,9 +536,9 @@ export function useParty(me: Guest | null) {
         const { url, exists } = await r2Link('put', row.original_path)
         if (exists) return
         const res = await fetch(url!, { method: 'PUT', body: stored, headers: { 'Content-Type': stored.type || 'image/jpeg' } })
-        if (!res.ok) throw new Error('r2 upload')
+        if (!res.ok) throw new Error(`r2 upload ${res.status}`)
       }
-      const onR2 = (await r2On()) && (await toR2().then(() => true, () => false))
+      const onR2 = (await r2On()) && (await toR2().then(() => true, (e) => (note('r2', e), false)))
       if (onR2) row = { ...row, on_r2: true }
       else await up(row.original_path, stored, stored.type || 'image/jpeg')
       const { error } = await db.rpc('send_photo', {
@@ -535,7 +552,10 @@ export function useParty(me: Guest | null) {
         p_bytes: stored.size,
         p_mission: row.mission_id,
       })
-      if (error) throw error
+      if (error) {
+        note('send_photo', error)
+        throw error
+      }
       // keep the local copy: the original stays on this phone for instant downloads
       setLocal((m) => {
         const cur = m.get(row.id)
