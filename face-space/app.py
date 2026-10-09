@@ -52,12 +52,38 @@ def read_image(url):
     return img
 
 
-def signatures(img, largest_only=False):
-    faces = [
+def detect(img):
+    return [
         f
         for f in load_model().get(img)
         if f.det_score >= MIN_SCORE and min(f.bbox[2] - f.bbox[0], f.bbox[3] - f.bbox[1]) >= MIN_FACE
     ]
+
+
+def shrunk(img, side):
+    """The image scaled down to `side` and centered on a gray square: a close-up face then fits the detector."""
+    h, w = img.shape[:2]
+    scale = side / max(h, w)
+    small = cv2.resize(img, (round(w * scale), round(h * scale)), interpolation=cv2.INTER_AREA)
+    canvas = np.full((side * 2, side * 2, 3), 127, np.uint8)
+    y, x = (side * 2 - small.shape[0]) // 2, (side * 2 - small.shape[1]) // 2
+    canvas[y : y + small.shape[0], x : x + small.shape[1]] = small
+    return canvas
+
+
+def selfie_faces(img):
+    """Selfies are close-ups, sometimes sideways: the detector misses faces bigger than about half its window."""
+    tries = [img, shrunk(img, 480), shrunk(img, 320)]
+    tries += [cv2.rotate(t, r) for t in tries[:2] for r in (cv2.ROTATE_90_CLOCKWISE, cv2.ROTATE_90_COUNTERCLOCKWISE, cv2.ROTATE_180)]
+    for t in tries:
+        faces = detect(t)
+        if faces:
+            return faces
+    return []
+
+
+def signatures(img, largest_only=False):
+    faces = selfie_faces(img) if largest_only else detect(img)
     if largest_only and faces:
         faces = [max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))]
     return [[round(float(x), 6) for x in f.normed_embedding] for f in faces]
@@ -79,6 +105,8 @@ def work_once():
         try:
             img = read_image(job["url"])
             emb = signatures(img, largest_only=job["kind"] == "selfie")
+            # sizes and counts only, never the image: tells why a selfie found no face
+            print(f"{job['kind']}: {img.shape[1]}x{img.shape[0]}, {len(emb)} rosto(s)", flush=True)
             del img
             call("save", {"kind": job["kind"], "id": job["id"], "embeddings": emb})
             status["done"] += 1
