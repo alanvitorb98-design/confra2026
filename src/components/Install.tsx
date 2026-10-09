@@ -8,7 +8,9 @@ interface InstallPromptEvent extends Event {
 
 const ua = navigator.userAgent
 const isIOS = /iphone|ipad|ipod/i.test(ua)
-const isIOSSafari = isIOS && /safari/i.test(ua) && !/crios|fxios|instagram|fban|fbav/i.test(ua)
+const isIOSSafari = isIOS && /safari/i.test(ua) && !/crios|edgios|fxios|instagram|fban|fbav/i.test(ua)
+// Chrome and Edge on iOS 16.4+ can add to the home screen from their own share button
+const isIOSChromium = isIOS && /crios|edgios/i.test(ua)
 const inAppBrowser = /instagram|fban|fbav|whatsapp|line\//i.test(ua)
 
 /** Black screen shown in the browser before the intro: puts the app on the home screen first. */
@@ -46,7 +48,11 @@ export function Install({ onSkip }: { onSkip: () => void }) {
       ]
     : isIOS
       ? [
-          isIOSSafari ? 'Toque em Compartilhar, o quadrado com a seta pra cima, na barra do Safari.' : 'Abra este link no Safari: no iPhone, só o Safari instala apps.',
+          isIOSSafari
+            ? 'Toque em Compartilhar, o quadrado com a seta pra cima, na barra do Safari.'
+            : isIOSChromium
+              ? 'Toque em Compartilhar, o quadrado com a seta pra cima, ao lado do endereço do site.'
+              : 'Abra este link no Safari ou no Chrome, que são os que instalam no iPhone.',
           'Role e toque em "Adicionar à Tela de Início".',
           'Toque em "Adicionar" e abra a Confra 26 pelo ícone.',
         ]
