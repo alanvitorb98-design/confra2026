@@ -569,3 +569,23 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
 .admin-secret code { word-break: break-all; padding: 10px; border-radius: 10px; background: #1d1a16; color: #f3cf6e; font-size: 12px; user-select: all; }
 .stats.two { grid-template-columns: repeat(2, 1fr); }
 .version { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
+
+.dark-hint {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(84px + env(safe-area-inset-bottom));
+  z-index: 60;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--gold);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+  line-height: 1.35;
+}
+.dark-hint p { margin: 0; flex: 1; }
