@@ -47,7 +47,7 @@ export async function enablePush(code: string): Promise<PushState> {
 export async function disablePush() {
   const sub = await subscription()
   if (!sub) return
-  await db.rpc('drop_push', { p_endpoint: sub.endpoint })
+  await db.rpc('drop_push', { p_endpoint: sub.endpoint, p_auth: sub.toJSON().keys?.auth })
   await sub.unsubscribe()
 }
 
@@ -55,6 +55,6 @@ export async function disablePush() {
 export async function testPush() {
   const sub = await subscription()
   if (!sub) throw new Error('avisos desligados')
-  const { error } = await db.functions.invoke('lembrete', { body: { op: 'test', endpoint: sub.endpoint } })
+  const { error } = await db.functions.invoke('lembrete', { body: { op: 'test', endpoint: sub.endpoint, auth: sub.toJSON().keys?.auth } })
   if (error) throw new Error('o servidor não conseguiu mandar')
 }
