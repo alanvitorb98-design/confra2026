@@ -10,6 +10,8 @@ import { Welcome } from './components/Welcome'
 import { exampleAppearances, exampleMissions, examplePhotos, examplePoints } from './lib/mock'
 import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Reaction } from './lib/types'
+import { Install } from './components/Install'
+import { isInstalled } from './lib/install'
 import { Splash } from './components/Splash'
 import { SynthScene } from './components/SynthScene'
 
@@ -34,6 +36,7 @@ export default function App() {
   const [open, setOpen] = useState<Photo | null>(null)
   const camera = useRef<HTMLInputElement>(null)
   const [intro, setIntro] = useState(true)
+  const [gate, setGate] = useState(() => !isInstalled())
 
   useEffect(() => {
     if (!guest) return
@@ -45,6 +48,7 @@ export default function App() {
     }
   }, [guest])
 
+  if (gate) return <Install onSkip={() => setGate(false)} />
   if (intro)
     return (
       <AnimatePresence>
