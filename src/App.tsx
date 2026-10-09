@@ -55,7 +55,7 @@ export default function App() {
   // which mission the photo being taken is for
   const [missionShot, setMissionShot] = useState<string>()
 
-  // the organizer's dates and place: before login only with the invitation code
+  // the organizer's dates and place
   useEffect(() => {
     loadEvent(code).then((ok) => ok && setConfigLoaded((n) => n + 1))
   }, [code])
@@ -65,7 +65,7 @@ export default function App() {
     else setIsAdmin(false)
   }, [guest])
 
-  // the browser can clear the login: then the guest signs in again with the code
+  // the browser can clear the login: then the guest signs in again
   useEffect(() => {
     if (guest) hasSession().then((ok) => !ok && setGuest(null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -81,7 +81,7 @@ export default function App() {
     }
   }, [guest])
 
-  if (gate) return <Install code={code} onSkip={() => setGate(false)} />
+  if (gate) return <Install onSkip={() => setGate(false)} />
   if (intro)
     return (
       <AnimatePresence>

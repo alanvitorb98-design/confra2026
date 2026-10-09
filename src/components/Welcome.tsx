@@ -6,8 +6,7 @@ import { PartyScene } from './PartyScene'
 
 type NewGuest = Omit<Guest, 'id'>
 
-export function Welcome({ code: fromQr, onEnter }: { code: string; onEnter: (code: string, g: NewGuest) => Promise<void> }) {
-  const [code, setCode] = useState(fromQr)
+export function Welcome({ code, onEnter }: { code: string; onEnter: (code: string, g: NewGuest) => Promise<void> }) {
   const [name, setName] = useState('')
   const [instagram, setInstagram] = useState('')
   const [faceOptIn, setFaceOptIn] = useState(true)
@@ -21,7 +20,7 @@ export function Welcome({ code: fromQr, onEnter }: { code: string; onEnter: (cod
     setSelfieUrl(URL.createObjectURL(f))
   }
 
-  const ready = code.trim().length >= 4 && name.trim().length > 1 && (!faceOptIn || selfieUrl)
+  const ready = name.trim().length > 1 && (!faceOptIn || selfieUrl)
 
   return (
     <div className="welcome">
@@ -43,9 +42,7 @@ export function Welcome({ code: fromQr, onEnter }: { code: string; onEnter: (cod
           } catch (err) {
             const reason = err instanceof JoinError ? err.reason : 'other'
             setError(
-              reason === 'code'
-                ? 'Código do convite não confere. Confere o que veio no QR.'
-                : reason === 'busy'
+              reason === 'busy'
                   ? 'Muitas tentativas. Espera um pouco e tenta de novo.'
                   : 'Não deu pra entrar agora. Confere a internet e tenta de novo.',
             )
@@ -53,12 +50,6 @@ export function Welcome({ code: fromQr, onEnter }: { code: string; onEnter: (cod
           }
         }}
       >
-        {!fromQr && (
-          <label className="field">
-            <span>Código do convite</span>
-            <input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="CONFRA-XXXXX" autoCapitalize="characters" autoComplete="off" />
-          </label>
-        )}
         <label className="field">
           <span>Seu nome</span>
           <input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="como te chamam na firma" autoComplete="given-name" />
