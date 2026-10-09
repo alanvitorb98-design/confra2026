@@ -28,6 +28,7 @@
 }
 
 * { box-sizing: border-box; }
+html { color-scheme: dark; background: var(--night); }
 html, body { margin: 0; min-height: 100%; overflow-x: clip; }
 body {
   background: var(--night);
@@ -77,7 +78,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 
 /* ambient: same picture, calmer, dimmed so cards stay readable */
 .scene-ambient { --hz: 64%; }
-.scene-ambient::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(9 6 32 / .55), rgb(9 6 32 / .25) 45%, rgb(9 6 32 / .45)); }
+.scene-ambient::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(9 6 32 / .3), transparent 35%, transparent 70%, rgb(9 6 32 / .35)); }
 
 /* intro: sun rises, ridges draw in, floor rushes toward you */
 .scene-intro .scene-sun { animation: sunrise 2.4s cubic-bezier(.16, .8, .2, 1) .15s both; }
@@ -108,7 +109,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .logo.small { font-size: 26px; filter: drop-shadow(0 1px 0 #7a2a8a) drop-shadow(0 2px 0 #3a1255) drop-shadow(0 0 10px rgb(255 61 154 / .5)); }
 
 /* ---------- shell ---------- */
-.app { min-height: 100vh; padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+.app { position: relative; isolation: isolate; min-height: 100vh; min-height: 100dvh; padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
 .topbar {
   position: sticky; top: 0; z-index: 10;
   display: flex; align-items: center; justify-content: space-between;
@@ -219,7 +220,7 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 
 /* ---------- feed: stack of Polaroids ---------- */
 .feed { display: grid; gap: 14px; padding-bottom: 12px; }
-.feed { --w: min(80vw, 400px, calc((100dvh - 360px) * .74)); }
+.feed { --w: min(80vw, 400px, calc((100dvh - 460px) * .8)); }
 .stack { position: relative; width: var(--w); justify-self: center; height: calc(var(--w) * 1.25 + 80px); margin-top: 4px; }
 .stack-card { position: absolute; inset: 0 0 auto 0; will-change: transform; }
 .stack-drag { touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
@@ -313,7 +314,7 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .frame-swatch[aria-checked='true'] { color: #fff; border-color: var(--glass-line); background: rgb(255 255 255 / .08); }
 
 /* ---------- install gate: plain black, before anything else ---------- */
-.install-gate { min-height: 100vh; display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)); background: #000; }
+.install-gate { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: calc(24px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px)); background: #000; }
 .install-card { width: 100%; max-width: 400px; display: grid; justify-items: center; gap: 16px; text-align: center; }
 .install-icon { border-radius: 20px; box-shadow: 0 0 0 1px rgb(255 255 255 / .08), 0 10px 30px rgb(255 61 154 / .35); }
 .install-title { margin: 0; font-family: var(--display); font-weight: 400; font-size: 24px; line-height: 1.2; text-wrap: balance; }
@@ -410,8 +411,9 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 
 /* ---------- welcome ---------- */
 .welcome {
-  min-height: 100vh; display: grid; align-content: center; gap: 28px;
-  padding: calc(28px + env(safe-area-inset-top, 0px)) 18px calc(28px + env(safe-area-inset-bottom, 0px));
+  position: relative; isolation: isolate;
+  min-height: 100vh; min-height: 100dvh; display: grid; align-content: center; gap: clamp(16px, 3.5dvh, 28px);
+  padding: calc(20px + env(safe-area-inset-top, 0px)) 18px calc(20px + env(safe-area-inset-bottom, 0px));
   max-width: 460px; margin: 0 auto;
 }
 .logo-block { text-align: center; }

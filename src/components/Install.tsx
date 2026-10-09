@@ -12,6 +12,11 @@ const isIOSSafari = isIOS && /safari/i.test(ua) && !/crios|edgios|fxios|instagra
 // Chrome and Edge on iOS 16.4+ can add to the home screen from their own share button
 const isIOSChromium = isIOS && /crios|edgios/i.test(ua)
 const inAppBrowser = /instagram|fban|fbav|whatsapp|line\//i.test(ua)
+const isSamsung = /samsungbrowser/i.test(ua)
+const isFirefox = /firefox|fxios/i.test(ua)
+const isEdge = /edga\//i.test(ua)
+const isOpera = /opr\/|opera/i.test(ua)
+const isAndroidChrome = /android/i.test(ua) && /chrome\//i.test(ua) && !isSamsung && !isEdge && !isOpera && !/miuibrowser|yabrowser|ucbrowser/i.test(ua)
 
 /** Black screen shown in the browser before the intro: puts the app on the home screen first. */
 export function Install({ onSkip }: { onSkip: () => void }) {
@@ -56,11 +61,35 @@ export function Install({ onSkip }: { onSkip: () => void }) {
           'Role e toque em "Adicionar à Tela de Início".',
           'Toque em "Adicionar" e abra a Confra 26 pelo ícone.',
         ]
-      : [
-          'Toque nos três pontinhos do Chrome, no canto de cima.',
-          'Escolha "Instalar app" ou "Adicionar à tela inicial".',
-          'Confirme e abra a Confra 26 pelo ícone.',
-        ]
+      : isSamsung
+        ? [
+            'Toque no menu do Samsung Internet, as três linhas no canto de baixo.',
+            'Toque em "Adicionar página a" e escolha "Tela inicial".',
+            'Confirme e abra a Confra 26 pelo ícone.',
+          ]
+        : isFirefox
+          ? [
+              'Toque nos três pontinhos do Firefox.',
+              'Escolha "Adicionar à tela inicial" ou "Instalar".',
+              'Confirme e abra a Confra 26 pelo ícone.',
+            ]
+          : isEdge
+            ? [
+                'Toque nos três pontinhos do Edge, embaixo.',
+                'Escolha "Adicionar ao telefone" ou "Adicionar à tela inicial".',
+                'Confirme e abra a Confra 26 pelo ícone.',
+              ]
+            : isAndroidChrome
+              ? [
+                  'Toque nos três pontinhos do Chrome, no canto de cima.',
+                  'Escolha "Instalar app" ou "Adicionar à tela inicial".',
+                  'Confirme e abra a Confra 26 pelo ícone.',
+                ]
+              : [
+                  'Toque no menu do navegador, os três pontinhos ou três linhas.',
+                  'Procure "Adicionar à tela inicial" ou "Instalar".',
+                  'Se não achar, abra este link no Chrome, que instala com um toque.',
+                ]
 
   return (
     <div className="install-gate">
