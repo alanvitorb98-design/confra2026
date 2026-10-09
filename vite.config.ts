@@ -24,6 +24,8 @@ export default defineConfig({
       workbox: {
         // version.json must always come from the network
         globIgnores: ['**/version.json'],
+        // shows the countdown reminders sent by the server
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // feed previews never change once posted: keep them on the phone so each one downloads once

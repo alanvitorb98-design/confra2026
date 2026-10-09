@@ -45,6 +45,11 @@ export function applyConfig(c: EventConfig, cache = true) {
   LOOK_OPENS = date(c.look_opens, LOOK_OPENS)
   LOOK_CLOSES = date(c.look_closes, LOOK_CLOSES)
   EVENT.testMode = !!c.test_mode
+  // test mode off on the server: no phone stays on a simulated clock
+  if (cache && !c.test_mode && testClock) {
+    setTestClock(null)
+    location.reload()
+  }
   // the place only comes with the code: never forget it because a later answer came without
   if (c.place) {
     EVENT.place = c.place
@@ -81,18 +86,29 @@ export function phaseAt(now: number): Phase {
 }
 
 // Test clock: open the app with ?agora=2026-11-07T08:00 to see any phase, ?agora=off to go back.
-// Kept per tab so a test link never sticks to a guest's phone.
+// Kept on the phone (so it also works in the installed app) and dropped as soon as the organizer turns test mode off.
 const KEY = 'confra.agora'
 let offset = 0
 try {
   const q = new URLSearchParams(location.search).get('agora')
-  if (q === 'off') sessionStorage.removeItem(KEY)
-  else if (q) sessionStorage.setItem(KEY, q)
-  const fake = sessionStorage.getItem(KEY)
+  if (q === 'off') localStorage.removeItem(KEY)
+  else if (q) localStorage.setItem(KEY, q)
+  sessionStorage.removeItem(KEY)
+  const fake = localStorage.getItem(KEY)
   const at = fake ? new Date(fake.length <= 16 ? `${fake}:00-03:00` : fake).getTime() : NaN
   if (!Number.isNaN(at)) offset = at - Date.now()
 } catch {
   /* storage blocked: real clock */
+}
+
+/** Put this phone on a simulated moment (ISO), or back on the real clock with null. Takes effect on reload. */
+export function setTestClock(at: string | null) {
+  try {
+    if (at) localStorage.setItem(KEY, at)
+    else localStorage.removeItem(KEY)
+  } catch {
+    /* storage blocked */
+  }
 }
 export const testClock = offset !== 0
 
@@ -124,26 +140,12 @@ export function until(ms: number) {
 export const clock = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 export const day = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
 
-/**
- * "Salvar na agenda" opens the phone's own calendar instead of downloading a file:
- * Google Calendar's add-event screen on Android, and on iPhone a calendar link that iOS turns into
- * its "Add to Calendar" sheet.
- */
-export function openCalendar(code: string) {
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-  if (ios) {
-    location.href = `https://optapzbhyhklcirdoyid.supabase.co/functions/v1/agenda?c=${encodeURIComponent(code)}`
-    return
-  }
-  const where = [EVENT.place, EVENT.address].filter(Boolean).join(' · ')
-  const q = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: 'Confra da Firma',
-    dates: `${fmt(EVENT.start)}/${fmt(EVENT.end)}`,
-    details: `Equipe Derhu${EVENT.mapsUrl ? ` · ${EVENT.mapsUrl}` : ''}`,
-    location: where,
-    ctz: 'America/Sao_Paulo',
-  })
-  window.open(`https://calendar.google.com/calendar/render?${q}`, '_blank', 'noopener')
-}
+const HOUR = 3600_000
+/** One moment inside each phase, for the test buttons (panel and the hidden countdown menu) */
+export const testMoments = () => [
+  { label: 'Contagem', at: APP_OPENS.getTime() - 24 * HOUR },
+  { label: 'Véspera', at: APP_OPENS.getTime() + HOUR },
+  { label: 'Looks', at: LOOK_OPENS.getTime() + HOUR },
+  { label: 'Festa', at: EVENT.end.getTime() - HOUR },
+  { label: 'Depois', at: EVENT.end.getTime() + HOUR },
+]
