@@ -90,7 +90,7 @@ export function SelfieCam({ onShot, onClose }: { onShot: (f: File) => void; onCl
           <video ref={video} playsInline muted />
           <div className="selfie-guide" aria-hidden />
           <p className={`selfie-light ${light ?? ''}`} role="status">{light ? LIGHT_TEXT[light] : 'Abrindo a câmera…'}</p>
-          <p className="selfie-tip">Encaixe o rosto no contorno, sem óculos escuros</p>
+          <p className="selfie-tip">Encaixe a cabeça inteira no contorno, sem óculos escuros</p>
           <button className="selfie-shoot" onClick={shoot} disabled={!light} aria-label="Tirar selfie"><span /></button>
         </>
       )}
