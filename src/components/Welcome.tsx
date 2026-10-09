@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Guest } from '../lib/types'
-import { SynthScene } from './SynthScene'
+import { Logo } from './Logo'
+import { PartyScene } from './PartyScene'
 
 export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
   const [name, setName] = useState('')
@@ -18,10 +19,10 @@ export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
 
   return (
     <div className="welcome">
-      <SynthScene variant="ambient" />
+      <PartyScene variant="ambient" />
       <div className="logo-block">
-        <h1 className="logo">CONFRA<span>26</span></h1>
-        <p className="logo-sub">fim de ano · 07.11.2026</p>
+        <Logo />
+        <p className="logo-sub">Equipe Derhu · 07/11</p>
       </div>
 
       <form
@@ -57,7 +58,7 @@ export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
           )}
         </div>
 
-        <button className="btn neon wide" disabled={!ready}>Entrar na festa</button>
+        <button className="btn primary wide" disabled={!ready}>Entrar na festa</button>
       </form>
     </div>
   )

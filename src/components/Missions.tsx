@@ -13,7 +13,7 @@ export function Missions({ missions, onShoot }: { missions: Mission[]; onShoot: 
             {i === 0 && <span className="mission-badge">Surpresa</span>}
             <span className="mission-title">{m.title}</span>
             <span className="mission-pts">+{m.points}</span>
-            {i === 0 && <button className="btn neon small" onClick={onShoot}>Tirar a foto</button>}
+            {i === 0 && <button className="btn primary small" onClick={onShoot}>Tirar a foto</button>}
           </li>
         ))}
         {done.map((m) => (

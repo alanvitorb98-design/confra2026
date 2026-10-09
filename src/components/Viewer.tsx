@@ -39,7 +39,7 @@ export function Viewer({ photo, onClose }: { photo: Photo; onClose: () => void }
             <button className="btn ghost small" disabled={busy} onClick={() => run(() => savePhoto(photo))}>
               Baixar original · {size(photo.file.size)}
             </button>
-            <button className="btn neon small" disabled={busy} onClick={() => run(async () => shareOrDownload(await makeStory(photo)))}>
+            <button className="btn primary small" disabled={busy} onClick={() => run(async () => shareOrDownload(await makeStory(photo)))}>
               {busy ? 'Montando…' : 'Postar no Story'}
             </button>
             {status && <span className="viewer-status">{status}</span>}

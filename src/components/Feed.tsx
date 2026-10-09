@@ -78,7 +78,7 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
             {isTop && burst > 0 && (
               <motion.span
                 key={burst}
-                className="burst"
+                className="burst-emoji"
                 aria-hidden
                 initial={{ scale: 0.2, opacity: 0, rotate: -20 }}
                 animate={{ scale: [0.2, 1.2, 1, 1.25], opacity: [0, 1, 1, 0], rotate: [-20, 8, 0, 0], y: [0, 0, 0, -60] }}

@@ -1,13 +1,13 @@
-export type Reaction = '🔥' | '😂' | '😍' | '🕺'
+export type Reaction = '🔥' | '😂' | '😍' | '🥂'
 
-export const REACTIONS: Reaction[] = ['🔥', '😂', '😍', '🕺']
+export const REACTIONS: Reaction[] = ['🔥', '😂', '😍', '🥂']
 
-export type Frame = 'dark' | 'chrome' | 'neon'
+export type Frame = 'classic' | 'gold' | 'dark'
 
 export const FRAMES: { id: Frame; label: string }[] = [
+  { id: 'classic', label: 'Clássica' },
+  { id: 'gold', label: 'Dourada' },
   { id: 'dark', label: 'Preta' },
-  { id: 'chrome', label: 'Cromada' },
-  { id: 'neon', label: 'Neon' },
 ]
 
 export interface Guest {

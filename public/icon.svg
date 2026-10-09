@@ -1,18 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs>
-    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffd23f"/>
-      <stop offset="0.55" stop-color="#ff4f9a"/>
-      <stop offset="1" stop-color="#b03cff"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="96" fill="#120a24"/>
-  <circle cx="256" cy="250" r="150" fill="url(#sun)"/>
-  <g fill="#120a24">
-    <rect x="96" y="250" width="320" height="14"/>
-    <rect x="96" y="290" width="320" height="18"/>
-    <rect x="96" y="334" width="320" height="22"/>
-  </g>
-  <path d="M40 400 H472" stroke="#38e1ff" stroke-width="6"/>
-  <path d="M256 400 L120 512 M256 400 L392 512 M256 400 L256 512" stroke="#38e1ff" stroke-width="4" opacity=".7"/>
+<defs><radialGradient id="bg" cx="50%" cy="45%" r="70%"><stop offset="0" stop-color="#fffbef"/><stop offset="1" stop-color="#f4e2a8"/></radialGradient>
+<radialGradient id="c" cx="38%" cy="32%" r="70%"><stop offset="0" stop-color="#fbe7a4"/><stop offset=".6" stop-color="#d9a52b"/><stop offset="1" stop-color="#a5770f"/></radialGradient></defs>
+<rect width="512" height="512" fill="url(#bg)"/>
+<g stroke="#d9a52b" stroke-width="16" stroke-linecap="round" fill="#f6d77c"><line x1="326.1" y1="256.0" x2="433.6" y2="256.0"/><circle cx="447.7" cy="256.0" r="11" stroke-width="5"/><line x1="329.4" y1="286.4" x2="385.5" y2="309.6"/><line x1="305.6" y1="305.6" x2="381.6" y2="381.6"/><circle cx="391.6" cy="391.6" r="11" stroke-width="5"/><line x1="286.4" y1="329.4" x2="309.6" y2="385.5"/><line x1="256.0" y1="326.1" x2="256.0" y2="433.6"/><circle cx="256.0" cy="447.7" r="11" stroke-width="5"/><line x1="225.6" y1="329.4" x2="202.4" y2="385.5"/><line x1="206.4" y1="305.6" x2="130.4" y2="381.6"/><circle cx="120.4" cy="391.6" r="11" stroke-width="5"/><line x1="182.6" y1="286.4" x2="126.5" y2="309.6"/><line x1="185.9" y1="256.0" x2="78.3" y2="256.0"/><circle cx="64.3" cy="256.0" r="11" stroke-width="5"/><line x1="182.6" y1="225.6" x2="126.5" y2="202.4"/><line x1="206.4" y1="206.4" x2="130.4" y2="130.4"/><circle cx="120.4" cy="120.4" r="11" stroke-width="5"/><line x1="225.6" y1="182.6" x2="202.4" y2="126.5"/><line x1="256.0" y1="185.9" x2="256.0" y2="78.3"/><circle cx="256.0" cy="64.3" r="11" stroke-width="5"/><line x1="286.4" y1="182.6" x2="309.6" y2="126.5"/><line x1="305.6" y1="206.4" x2="381.6" y2="130.4"/><circle cx="391.6" cy="120.4" r="11" stroke-width="5"/><line x1="329.4" y1="225.6" x2="385.5" y2="202.4"/></g>
+<circle cx="256.0" cy="256.0" r="74" fill="url(#c)"/>
+<text x="256" y="292" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="104" fill="#1d1a16">C</text>
 </svg>
