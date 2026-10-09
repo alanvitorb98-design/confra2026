@@ -23,6 +23,7 @@ import { PartyScene } from './components/PartyScene'
 type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
 const GUEST_KEY = 'confra26.guest'
+const ORG_KEY = 'confra26.org'
 
 function loadGuest(): Guest | null {
   try {
@@ -47,7 +48,16 @@ export default function App() {
   const [gate, setGate] = useState(() => !isInstalled())
   const t = useNow()
   const phase = phaseAt(t)
-  const party = useParty(guest && phase !== 'countdown' ? guest : null)
+  // an organizer code typed on the countdown lets this phone in early (checked by the server on sign-in)
+  const [orgCode, setOrgCode] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(ORG_KEY)
+    } catch {
+      return null
+    }
+  })
+  const early = phase === 'countdown' && !!orgCode
+  const party = useParty(guest && (phase !== 'countdown' || early) ? guest : null)
   const photos = party.photos
   const [, setConfigLoaded] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -61,9 +71,24 @@ export default function App() {
   }, [code])
 
   useEffect(() => {
-    if (guest) amAdmin().then(setIsAdmin)
-    else setIsAdmin(false)
-  }, [guest])
+    if (!guest) return setIsAdmin(false)
+    amAdmin().then(async (yes) => {
+      if (!yes && orgCode) yes = await claimAdmin(orgCode).catch(() => false)
+      setIsAdmin(yes)
+      // a wrong organizer code sends this phone back to the countdown
+      if (!yes && orgCode) forgetOrg()
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [guest, orgCode])
+
+  const forgetOrg = () => {
+    try {
+      localStorage.removeItem(ORG_KEY)
+    } catch {
+      /* private mode */
+    }
+    setOrgCode(null)
+  }
 
   // the browser can clear the login: then the guest signs in again
   useEffect(() => {
@@ -88,7 +113,19 @@ export default function App() {
         <Splash key="splash" onDone={() => setIntro(false)} />
       </AnimatePresence>
     )
-  if (phase === 'countdown') return <Countdown />
+  if (phase === 'countdown' && !early)
+    return (
+      <Countdown
+        onOrganizer={(c) => {
+          try {
+            localStorage.setItem(ORG_KEY, c)
+          } catch {
+            /* private mode: works until the page closes */
+          }
+          setOrgCode(c)
+        }}
+      />
+    )
   if (!guest) return (
       <Welcome
         code={code}

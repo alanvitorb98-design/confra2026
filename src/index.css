@@ -471,6 +471,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .cd-remind .cd-remind-on { font-weight: 600; color: var(--ink); }
 .cd-test { position: fixed; inset: auto 12px calc(12px + env(safe-area-inset-bottom)) 12px; z-index: 50; display: grid; gap: 8px; padding: 16px; border-radius: 20px; background: var(--card); border: 1px solid rgb(217 165 43 / .6); box-shadow: var(--shadow-3); text-align: center; }
 .cd-test p { margin: 0; font-size: 13px; color: var(--ink-2); }
+.cd-test input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgb(217 165 43 / .6); background: var(--paper); color: var(--ink); font: inherit; text-align: center; letter-spacing: .08em; }
+.cd-org { margin-top: 4px; background: none; border: 0; color: var(--ink-2); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; opacity: .75; cursor: pointer; }
 
 /* ---------- phase bar + walls ---------- */
 .phasebar {
