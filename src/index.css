@@ -48,7 +48,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold-deep);
     radial-gradient(120% 70% at 50% 42%, #fffbef 0%, transparent 60%),
     linear-gradient(180deg, #fcf5de, var(--paper) 50%, var(--paper-2));
 }
-.burst, .dot, .star { position: absolute; width: var(--s); height: var(--s); translate: -50% -50%; }
+.burst, .dot, .star { position: absolute; width: var(--s); height: var(--s); translate: -50% -50%; will-change: transform, opacity; }
 .burst-svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .burst-ray { stroke: var(--gold); stroke-width: 5; stroke-linecap: round; }
 .burst-tip { fill: var(--gold-hi); stroke: var(--gold); stroke-width: 2; }
@@ -65,7 +65,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--gold-deep);
 .dot.pale { background: #f4dc93; box-shadow: none; opacity: .75; }
 .dot.ring { background: none; box-shadow: none; border: max(2px, .5vmin) solid var(--gold); opacity: .8; }
 @keyframes float { to { translate: -50% calc(-50% - 10px); } }
-.star { fill: var(--gold); filter: drop-shadow(0 1px 1px rgb(120 80 10 / .25)); animation: twinkle 3.2s ease-in-out var(--d) infinite alternate; }
+.star { fill: var(--gold); animation: twinkle 3.2s ease-in-out var(--d) infinite alternate; }
 @keyframes twinkle { from { opacity: .45; scale: .85; } to { opacity: 1; scale: 1; } }
 .comet { position: absolute; left: 14%; top: 9%; width: 22vmin; rotate: -8deg; fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; opacity: .85; }
 .sparkler { position: absolute; width: 2px; height: 34vmin; background: linear-gradient(var(--ink), var(--ink-2)); border-radius: 1px; }
@@ -210,7 +210,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .feed { --w: min(80vw, 400px, calc((100dvh - 460px) * .8)); }
 .stack { position: relative; width: var(--w); justify-self: center; height: calc(var(--w) * 1.25 + 80px); margin-top: 4px; }
 .stack-card { position: absolute; inset: 0 0 auto 0; will-change: transform; }
-.stack-drag { touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+.stack-shade { will-change: opacity; position: absolute; inset: 0; z-index: 1; border-radius: 3px; background: var(--ink); pointer-events: none; }
+.stack-drag { will-change: transform; touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
 .stack-drag:active { cursor: grabbing; }
 .feed-pos { font-size: 12px; letter-spacing: .14em; color: var(--muted); font-variant-numeric: tabular-nums; }
 .feed-tip { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
@@ -271,17 +272,15 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 @keyframes wobble { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(-1deg) translateY(-3px); } }
 .stage-done .develop-polaroid { transform: rotate(-2deg); animation: zoomout .9s both, bounce .6s cubic-bezier(.3, 1.8, .5, 1) both; }
 @keyframes bounce { 30% { transform: rotate(1deg) scale(1.05); } }
-.develop-polaroid img { filter: blur(calc((1 - var(--p)) * 10px)) saturate(var(--p)) contrast(calc(.6 + var(--p) * .4)); transition: filter .15s linear; }
+.develop-polaroid .develop-blur { filter: blur(10px) saturate(.15) contrast(.6); transform: scale(1.08); }
+.develop-polaroid .develop-sharp { position: absolute; inset: 0; opacity: var(--p); }
 .develop-veil {
   position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(160deg, #2a2620, #0d0b09);
+  background: linear-gradient(160deg, rgb(52 40 28 / .92), rgb(13 11 9 / .96));
   opacity: calc(1 - var(--p) * 1.05);
-  mix-blend-mode: multiply;
-  transition: opacity .15s linear;
 }
-.develop-veil::after { content: ''; position: absolute; inset: 0; background: rgb(120 90 60 / .5); opacity: calc(1 - var(--p)); mix-blend-mode: color; }
 .develop-meter { display: block; width: 100%; height: 6px; border-radius: 3px; background: rgb(60 40 10 / .15); box-shadow: inset 0 1px 2px rgb(60 40 10 / .3); overflow: hidden; }
-.develop-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-hi), var(--gold)); box-shadow: 0 0 8px rgb(217 165 43 / .7); transition: width .1s linear; }
+.develop-meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--gold-hi), var(--gold)); transform: scaleX(var(--p)); transform-origin: left; }
 .caption-input {
   width: 100%; border: 0; background: transparent; color: inherit; font-family: var(--hand); font-weight: 700; font-size: 25px;
   border-bottom: 1px dashed rgb(60 40 10 / .3); padding: 2px 0;

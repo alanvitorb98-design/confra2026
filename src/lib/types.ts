@@ -24,6 +24,8 @@ export interface Photo {
   caption: string
   /** Full-quality original, shown in the viewer and used for the final album */
   url?: string
+  /** Light copy (about 1080px wide) used on screen while animating */
+  preview?: string
   /** The untouched camera file, for downloads */
   file?: File
   /** CSS background used by the example photos until the backend exists */

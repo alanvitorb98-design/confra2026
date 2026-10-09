@@ -69,7 +69,7 @@ export default function App() {
       }),
     )
 
-  const post = (caption: string, frame: Frame) => {
+  const post = (caption: string, frame: Frame, preview: string) => {
     if (!shot) return
     const photo: Photo = {
       id: crypto.randomUUID(),
@@ -77,6 +77,7 @@ export default function App() {
       caption,
       // the untouched original File: no resizing or recompression anywhere
       url: URL.createObjectURL(shot),
+      preview,
       file: shot,
       takenAt: new Date(),
       reactions: { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
