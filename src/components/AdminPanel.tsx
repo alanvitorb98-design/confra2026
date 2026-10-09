@@ -1,7 +1,7 @@
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 import { admin, type AdminEvent, type MissionRow } from '../lib/backend'
-import { APP_OPENS, EVENT, LOOK_OPENS, testClock } from '../lib/event'
+import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
 
 const APP_URL = `${location.origin}${import.meta.env.BASE_URL}`
@@ -23,15 +23,6 @@ const TIMES: { key: keyof AdminEvent; label: string }[] = [
   { key: 'look_closes', label: 'Look da Confra fecha' },
   { key: 'party_starts', label: 'Festa começa' },
   { key: 'party_ends', label: 'Festa termina' },
-]
-
-const HOUR = 3600_000
-const phases = () => [
-  { label: 'Contagem', at: APP_OPENS.getTime() - 24 * HOUR },
-  { label: 'Véspera', at: APP_OPENS.getTime() + HOUR },
-  { label: 'Looks', at: LOOK_OPENS.getTime() + HOUR },
-  { label: 'Festa', at: EVENT.end.getTime() - HOUR },
-  { label: 'Depois', at: EVENT.end.getTime() + HOUR },
 ]
 
 const mb = (b: number) => (b / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
@@ -257,7 +248,7 @@ export function AdminPanel({ missions, onClose }: Props) {
         <h3>Testes</h3>
         <p className="page-note">Simula o horário só neste celular, pra ver cada fase do app.{testClock && ' Simulação ligada.'}</p>
         <div className="admin-row wrap">
-          {phases().map((p) => (
+          {testMoments().map((p) => (
             <button key={p.label} className="btn ghost small" onClick={() => (location.href = `${APP_URL}?agora=${toLocal(new Date(p.at).toISOString())}`)}>{p.label}</button>
           ))}
           <button className="btn ghost small" onClick={() => (location.href = `${APP_URL}?agora=off`)}>Hora real</button>

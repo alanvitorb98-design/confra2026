@@ -1,4 +1,4 @@
-import { EVENT, LOOK_CLOSES, LOOK_OPENS, clock, lookOpen, until, type Phase } from '../lib/event'
+import { EVENT, LOOK_CLOSES, LOOK_OPENS, clock, lookOpen, setTestClock, until, type Phase } from '../lib/event'
 
 /** One line under the top bar saying what is open now and what comes next. */
 export function PhaseBar({ phase, now, test }: { phase: Phase; now: number; test: boolean }) {
@@ -16,7 +16,15 @@ export function PhaseBar({ phase, now, test }: { phase: Phase; now: number; test
     <div className={`phasebar phase-${phase}`} role="status">
       <span className="phasebar-dot" aria-hidden />
       <span>{text}</span>
-      {test && <span className="phasebar-test">teste</span>}
+      {test && (
+        <button
+          className="phasebar-test"
+          title="Voltar pra hora real"
+          onClick={() => confirm('Sair do relógio de teste e voltar pra hora real?') && (setTestClock(null), location.reload())}
+        >
+          teste ×
+        </button>
+      )}
     </div>
   )
 }

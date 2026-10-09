@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
-import { APP_OPENS, EVENT, clock, day, openCalendar, split, useNow } from '../lib/event'
-import { eventCode } from '../lib/backend'
+import { APP_OPENS, EVENT, clock, day, setTestClock, split, testClock, testMoments, useNow } from '../lib/event'
+import { Reminders } from './Reminders'
 import { PlaceMap } from './PlaceMap'
 import { Logo } from './Logo'
 import { PartyScene } from './PartyScene'
@@ -33,11 +33,14 @@ export function Countdown() {
   const t = useNow(true)
   const left = split(EVENT.start.getTime() - t)
   const [place, setPlace] = useState(false)
+  // test mode only: five taps on the logo open a menu to jump to any phase on this phone
+  const [taps, setTaps] = useState(0)
+  const tapLogo = () => EVENT.testMode && setTaps((n) => n + 1)
 
   return (
     <div className="countdown">
       <PartyScene variant="ambient" />
-      <div className="logo-block">
+      <div className="logo-block" onClick={tapLogo}>
         <Logo />
         <p className="logo-sub">Equipe Derhu</p>
       </div>
@@ -52,6 +55,8 @@ export function Countdown() {
         </div>
         <p className="cd-when">{day(EVENT.start)} às {clock(EVENT.start)}</p>
       </div>
+
+      <Reminders />
 
       {!EVENT.place ? (
         <p className="cd-note">O local aparece quando você abre pelo QR do convite.</p>
@@ -69,10 +74,11 @@ export function Countdown() {
             <b>{EVENT.place}</b>
             {EVENT.address && <p>{EVENT.address}</p>}
             <PlaceMap />
-            <div className="cd-actions">
-              {EVENT.mapsUrl && <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>}
-              <button className="btn ghost small" onClick={() => openCalendar(eventCode())}>Salvar na agenda</button>
-            </div>
+            {EVENT.mapsUrl && (
+              <div className="cd-actions">
+                <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>
+              </div>
+            )}
           </motion.div>
         ) : (
           <motion.button key="reveal" className="btn primary wide" onClick={() => setPlace(true)} exit={{ opacity: 0, scale: 0.96 }} whileTap={{ scale: 0.96 }}>
@@ -83,6 +89,22 @@ export function Countdown() {
       )}
 
       <p className="cd-note">O app abre no dia {day(APP_OPENS)} às {clock(APP_OPENS)} pra você fazer seu cadastro.</p>
+
+      {taps >= 5 && (
+        <div className="cd-test" role="dialog" aria-label="Testar o app">
+          <b>Testar o app neste celular</b>
+          <p>Escolha uma fase. O relógio de teste some sozinho quando o modo teste for desligado no painel.</p>
+          <div className="cd-actions">
+            {testMoments().map((m) => (
+              <button key={m.label} className="btn ghost small" onClick={() => { setTestClock(new Date(m.at).toISOString()); location.reload() }}>
+                {m.label}
+              </button>
+            ))}
+            {testClock && <button className="btn ghost small" onClick={() => { setTestClock(null); location.reload() }}>Hora real</button>}
+            <button className="btn ghost small" onClick={() => setTaps(0)}>Fechar</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
