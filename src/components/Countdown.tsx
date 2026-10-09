@@ -29,13 +29,16 @@ function Unit({ value, label }: { value: number; label: string }) {
 }
 
 /** Before the app opens: countdown to the party, with the place behind a button. */
-export function Countdown() {
+export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void }) {
   const t = useNow(true)
   const left = split(EVENT.start.getTime() - t)
   const [place, setPlace] = useState(false)
   // test mode only: five taps on the logo open a menu to jump to any phase on this phone
   const [taps, setTaps] = useState(0)
   const tapLogo = () => EVENT.testMode && setTaps((n) => n + 1)
+  // organizers get into the app before it opens, to set up missions and times
+  const [org, setOrg] = useState(false)
+  const [orgCode, setOrgCode] = useState('')
 
   return (
     <div className="countdown">
@@ -74,11 +77,10 @@ export function Countdown() {
             <b>{EVENT.place}</b>
             {EVENT.address && <p>{EVENT.address}</p>}
             <PlaceMap />
-            {EVENT.mapsUrl && (
-              <div className="cd-actions">
-                <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>
-              </div>
-            )}
+            <div className="cd-actions">
+              {EVENT.mapsUrl && <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>}
+              <button className="btn ghost small" onClick={() => setPlace(false)}>Esconder</button>
+            </div>
           </motion.div>
         ) : (
           <motion.button key="reveal" className="btn primary wide" onClick={() => setPlace(true)} exit={{ opacity: 0, scale: 0.96 }} whileTap={{ scale: 0.96 }}>
@@ -89,6 +91,20 @@ export function Countdown() {
       )}
 
       <p className="cd-note">O app abre no dia {day(APP_OPENS)} às {clock(APP_OPENS)} pra você fazer seu cadastro.</p>
+
+      {org ? (
+        <form className="cd-test" onSubmit={(e) => { e.preventDefault(); if (orgCode.trim()) onOrganizer(orgCode.trim()) }}>
+          <b>Entrar como organização</b>
+          <p>Digite o código de organizador. Depois é só fazer seu cadastro e o painel aparece em Eu.</p>
+          <input value={orgCode} onChange={(e) => setOrgCode(e.target.value.toUpperCase())} placeholder="ADM-XXXXXXXX" autoCapitalize="characters" autoComplete="off" />
+          <div className="cd-actions">
+            <button className="btn primary small" disabled={!orgCode.trim()}>Entrar</button>
+            <button type="button" className="btn ghost small" onClick={() => setOrg(false)}>Fechar</button>
+          </div>
+        </form>
+      ) : (
+        <button className="cd-org" onClick={() => setOrg(true)}>Sou da organização</button>
+      )}
 
       {taps >= 5 && (
         <div className="cd-test" role="dialog" aria-label="Testar o app">
