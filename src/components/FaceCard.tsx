@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { faceOptOut, myFaceStatus, sendSelfie } from '../lib/backend'
 import type { Guest } from '../lib/types'
+import { SelfieCam } from './SelfieCam'
 
 type Status = 'none' | 'pending' | 'ready' | 'failed'
 
@@ -15,6 +16,7 @@ const TEXT: Record<Status, string> = {
 export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Guest) => void }) {
   const [status, setStatus] = useState<Status>()
   const [busy, setBusy] = useState(false)
+  const [cam, setCam] = useState(false)
 
   useEffect(() => {
     let alive = true
@@ -30,6 +32,7 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
 
   const pick = async (f?: File) => {
     if (!f) return
+    setCam(false)
     setBusy(true)
     try {
       await sendSelfie(guest.id, f)
@@ -49,10 +52,9 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
       <p>{TEXT[status]}</p>
       <div className="admin-row">
         {status !== 'pending' && (
-          <label className={`btn ${status === 'ready' ? 'ghost' : 'primary'} small`}>
-            <input type="file" accept="image/*" capture="user" hidden onChange={(e) => pick(e.target.files?.[0])} disabled={busy} />
+          <button className={`btn ${status === 'ready' ? 'ghost' : 'primary'} small`} disabled={busy} onClick={() => setCam(true)}>
             {busy ? 'Enviando…' : status === 'ready' ? 'Trocar selfie' : 'Tirar selfie'}
-          </label>
+          </button>
         )}
         {(status === 'ready' || status === 'pending') && (
           <button
@@ -70,6 +72,7 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
           </button>
         )}
       </div>
+      {cam && <SelfieCam onShot={pick} onClose={() => setCam(false)} />}
     </div>
   )
 }
