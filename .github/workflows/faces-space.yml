@@ -1,0 +1,44 @@
+name: Face server (Hugging Face)
+
+# Creates or updates the private Space that runs the face model. Needs two repository secrets:
+# HF_TOKEN (Hugging Face token with write access) and FACE_SECRET (generated in the app's organizer panel).
+# Without them the job just says so and stops.
+on:
+  push:
+    branches: [main]
+    paths: ['face-space/**', '.github/workflows/faces-space.yml']
+  workflow_dispatch:
+
+concurrency:
+  group: faces-space
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      FACE_SECRET: ${{ secrets.FACE_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install huggingface_hub==0.26.2
+      - name: Publish the Space
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          token, secret = os.environ.get("HF_TOKEN"), os.environ.get("FACE_SECRET")
+          if not token or not secret:
+              print("::notice::Add the HF_TOKEN and FACE_SECRET repository secrets to publish the face server.")
+              raise SystemExit(0)
+          api = HfApi(token=token)
+          repo = f"{api.whoami()['name']}/confra-rostos"
+          api.create_repo(repo, repo_type="space", space_sdk="docker", private=True, exist_ok=True)
+          api.add_space_secret(repo, "FACE_SECRET", secret)
+          api.add_space_variable(repo, "FACES_URL", "https://optapzbhyhklcirdoyid.supabase.co/functions/v1/faces")
+          api.upload_folder(repo_id=repo, repo_type="space", folder_path="face-space", commit_message="Update from GitHub")
+          print(f"::notice::Face server published: https://huggingface.co/spaces/{repo}")
+          PY

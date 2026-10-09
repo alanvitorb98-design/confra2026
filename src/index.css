@@ -549,3 +549,10 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .organizer-link { color: var(--muted); justify-self: center; }
 .cd-place .place-map { aspect-ratio: 2 / 1; }
 @media (max-height: 720px) { .cd-place .place-map { aspect-ratio: 5 / 2; } }
+.viewer-faces { font-size: 13px; color: #e9d9a6; }
+.face-card { display: grid; gap: 8px; padding: 16px; }
+.face-card p { margin: 0; color: var(--ink-2); font-size: 14px; }
+.face-card .admin-row { justify-content: flex-start; }
+.admin-secret { display: grid; gap: 8px; }
+.admin-secret code { word-break: break-all; padding: 10px; border-radius: 10px; background: #1d1a16; color: #f3cf6e; font-size: 12px; user-select: all; }
+.stats.two { grid-template-columns: repeat(2, 1fr); }

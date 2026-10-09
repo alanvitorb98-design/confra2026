@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
-import { storageCopy } from './preview'
+import { makePreview, storageCopy } from './preview'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
 
 // Public project address and publishable key: safe in the browser, every write is checked by the database.
@@ -66,6 +66,32 @@ export async function hasSession() {
 
 export const leave = () => db.auth.signOut()
 
+/** A light copy (1600px) only for face matching; the face server deletes it once read. */
+async function lightCopy(file: Blob, width: number) {
+  const url = await makePreview(file as File, width)
+  try {
+    return await fetch(url).then((r) => r.blob())
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+/** Sends the selfie for face matching. The server keeps only its numbers and deletes the photo. */
+export async function sendSelfie(guestId: string, selfie: Blob) {
+  const path = `selfie/${guestId}/${crypto.randomUUID()}.jpg`
+  const { error } = await db.storage.from(BUCKET).upload(path, await lightCopy(selfie, 1080), { contentType: 'image/jpeg', upsert: false })
+  if (error) throw error
+  const { error: e2 } = await db.rpc('set_selfie', { p_path: path })
+  if (e2) throw e2
+}
+
+export const faceOptOut = () => db.rpc('face_opt_out')
+
+export async function myFaceStatus(guestId: string) {
+  const { data } = await db.from('guests').select('face_status').eq('id', guestId).single()
+  return (data?.face_status ?? 'none') as 'none' | 'pending' | 'ready' | 'failed'
+}
+
 /** Party times (always) and place (with the invitation code or a login), from the organizer's settings. */
 export async function loadEvent(code?: string) {
   const { data, error } = await db.rpc('event_public', { p_code: code || null })
@@ -119,6 +145,9 @@ export const admin = {
     call<string>('admin_save_mission', { p_id: m.id ?? null, p_title: m.title, p_points: m.points, p_active: m.active, p_sort: m.sort }),
   clearPhotos: () => call<number>('admin_clear_photos'),
   stats: () => call<{ guests: number; photos: number; bytes: number }>('admin_stats'),
+  faceStats: () => call<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>('admin_face_stats'),
+  faceSecret: () => call<string>('admin_face_secret'),
+  wipeFaces: () => call<void>('admin_wipe_faces'),
 }
 
 interface PhotoRow {
@@ -178,6 +207,8 @@ export function useParty(me: Guest | null) {
   const [links, setLinks] = useState<Map<string, string>>(new Map())
   const [missionRows, setMissionRows] = useState<MissionRow[]>([])
   const [eventVersion, setEventVersion] = useState(0)
+  // who appears in which photo: photo id -> guest ids
+  const [faces, setFaces] = useState<Map<string, Set<string>>>(new Map())
   const signedAt = useRef(new Map<string, number>())
   const localRef = useRef(local)
   localRef.current = local
@@ -217,8 +248,17 @@ export function useParty(me: Guest | null) {
       if (alive && data) setMissionRows(data as MissionRow[])
     }
 
+    const loadFaces = async () => {
+      const { data } = await db.from('photo_faces').select('photo_id,guest_id')
+      if (!alive || !data) return
+      const m = new Map<string, Set<string>>()
+      for (const f of data) m.set(f.photo_id, (m.get(f.photo_id) ?? new Set()).add(f.guest_id))
+      setFaces(m)
+    }
+
     const load = async () => {
       void loadMissions()
+      void loadFaces()
       void loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1))
       const [g, p, r] = await Promise.all([
         db.from('guests').select('id,name'),
@@ -253,6 +293,7 @@ export function useParty(me: Guest | null) {
         })
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, () => void loadMissions())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_faces' }, () => void loadFaces())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'event_config' }, () => {
         void loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1))
       })
@@ -313,6 +354,7 @@ export function useParty(me: Guest | null) {
       reactions: counts.get(row.id) ?? { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
       mine: mine.get(row.id) ?? {},
       missionId: row.mission_id ?? undefined,
+      faces: [...(faces.get(row.id) ?? [])].map((g) => guests.get(g) ?? 'Convidado'),
     })
     for (const l of local.values()) all.set(l.row.id, toPhoto(rows.get(l.row.id) ?? l.row, l))
     for (const row of rows.values()) if (!all.has(row.id)) all.set(row.id, toPhoto(row))
@@ -326,7 +368,17 @@ export function useParty(me: Guest | null) {
     return [...all.values()]
       .filter((p) => p.kind !== 'look' || latestLook.get(p.authorId!) === p)
       .sort((a, b) => b.takenAt.getTime() - a.takenAt.getTime())
-  }, [rows, reactions, guests, local, links, me?.id, me?.name])
+  }, [rows, reactions, guests, local, links, faces, me?.id, me?.name])
+
+  // ranking of who appears most, from the face matches on photos still in the feed
+  const appearances = useMemo(() => {
+    const count = new Map<string, number>()
+    for (const [photo, set] of faces) {
+      if (!rows.has(photo)) continue
+      for (const g of set) count.set(g, (count.get(g) ?? 0) + 1)
+    }
+    return [...count].map(([g, value]) => ({ name: guests.get(g) ?? 'Convidado', value })).sort((a, b) => b.value - a.value)
+  }, [faces, rows, guests])
 
   // a mission counts once per guest, from the first photo posted for it
   const { missions, points } = useMemo(() => {
@@ -391,6 +443,8 @@ export function useParty(me: Guest | null) {
         if (error && !/exists|Duplicate/i.test(error.message)) throw error
       }
       await up(row.preview_path, previewBlob, 'image/jpeg')
+      // party photos also get a 1600px copy for the face server, deleted after it is read
+      if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
       await up(row.original_path, stored, stored.type || 'image/jpeg')
       const { error } = await db.rpc('send_photo', {
         p_id: row.id,
@@ -443,5 +497,5 @@ export function useParty(me: Guest | null) {
     if (l) void send(l)
   }
 
-  return { photos, guests, state, missions, allMissions: missionRows, points, eventVersion, react, post, retry, hide, reconnect: () => setReload((n) => n + 1) }
+  return { photos, guests, state, missions, allMissions: missionRows, points, appearances, eventVersion, react, post, retry, hide, reconnect: () => setReload((n) => n + 1) }
 }

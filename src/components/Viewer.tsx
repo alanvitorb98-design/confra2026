@@ -41,6 +41,7 @@ export function Viewer({ photo, onClose, canRemove, onRemove }: Props) {
         <div className="viewer-text">
           <span>{photo.caption}</span>
           <span className="viewer-author">por {photo.author}</span>
+          {photo.faces && photo.faces.length > 0 && <span className="viewer-faces">Aparece: {photo.faces.join(', ')}</span>}
         </div>
         {photo.url ? (
           <div className="viewer-actions">

@@ -8,7 +8,7 @@ import { Ranking } from './components/Ranking'
 import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
 import { AdminPanel } from './components/AdminPanel'
-import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, useParty } from './lib/backend'
+import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
@@ -89,7 +89,22 @@ export default function App() {
       </AnimatePresence>
     )
   if (phase === 'countdown') return <Countdown />
-  if (!guest) return <Welcome code={code} onEnter={async (c, g) => setGuest(await join(c, g))} />
+  if (!guest) return (
+      <Welcome
+        code={code}
+        onEnter={async (c, g) => {
+          const me = await join(c, g)
+          setGuest(me)
+          // face matching is opt-in: the selfie goes up only for those who said yes
+          if (g.faceOptIn && g.selfieUrl) {
+            fetch(g.selfieUrl)
+              .then((res) => res.blob())
+              .then((b) => sendSelfie(me.id, b))
+              .catch(() => undefined)
+          }
+        }}
+      />
+    )
 
   // before the party only the outfit wall exists; afterwards both, party first
   const showWall: Wall = phase === 'warmup' || phase === 'look' ? 'look' : wall
@@ -176,10 +191,11 @@ export default function App() {
           />
         )}
         {tab === 'missions' && <Missions missions={party.missions} onShoot={shoot} locked={phase !== 'party'} phase={phase} />}
-        {tab === 'ranking' && <Ranking points={party.points} appearances={[]} looks={bestLooks} />}
+        {tab === 'ranking' && <Ranking points={party.points} appearances={party.appearances} looks={bestLooks} />}
         {tab === 'me' && (
           <Profile
             guest={guest}
+            onGuest={setGuest}
             isAdmin={isAdmin}
             onPanel={() => setPanel(true)}
             onClaim={async (c: string) => {

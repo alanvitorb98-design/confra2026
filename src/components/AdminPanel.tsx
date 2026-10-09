@@ -52,6 +52,8 @@ export function AdminPanel({ missions, onClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState<Record<string, { title: string; points: number; active: boolean }>>({})
   const [adding, setAdding] = useState({ title: '', points: 30 })
+  const [faceStats, setFaceStats] = useState<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>()
+  const [faceSecret, setFaceSecret] = useState<string>()
 
   const link = code ? `${APP_URL}?c=${encodeURIComponent(code)}` : ''
 
@@ -59,6 +61,7 @@ export function AdminPanel({ missions, onClose }: Props) {
     admin.event().then(setEv).catch(() => setMsg('Não consegui carregar as configurações.'))
     admin.code().then(setCode).catch(() => undefined)
     admin.stats().then(setStats).catch(() => undefined)
+    admin.faceStats().then(setFaceStats).catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -211,6 +214,43 @@ export function AdminPanel({ missions, onClose }: Props) {
           </li>
         </ul>
         <p className="page-note">Missão desativada some pra quem ainda não fez. Os pontos de quem já fez continuam.</p>
+      </section>
+
+      <section className="panel admin-section">
+        <h3>Reconhecimento de rosto</h3>
+        {faceStats && (
+          <p className="page-note">
+            {faceStats.selfies} {faceStats.selfies === 1 ? 'selfie pronta' : 'selfies prontas'} · {faceStats.pending} {faceStats.pending === 1 ? 'foto' : 'fotos'} na fila ·{' '}
+            {faceStats.worker_seen ? `servidor visto ${new Date(faceStats.worker_seen).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : 'servidor ainda não conectou'}
+          </p>
+        )}
+        {faceSecret ? (
+          <div className="admin-secret">
+            <code>{faceSecret}</code>
+            <p className="page-note">
+              Aparece só agora. No GitHub do app: Settings → Secrets and variables → Actions → New repository secret, nome <b>FACE_SECRET</b>, cola esse valor. Depois rode a ação "Face server".
+            </p>
+            <button className="btn ghost small" onClick={() => run(() => navigator.clipboard.writeText(faceSecret), 'Senha copiada.')}>Copiar senha</button>
+          </div>
+        ) : (
+          <button
+            className="btn ghost small"
+            disabled={busy}
+            onClick={() =>
+              (!faceStats?.has_secret || confirm('Gerar outra senha? O servidor de rostos para até você trocar o FACE_SECRET no GitHub.')) &&
+              run(async () => setFaceSecret(await admin.faceSecret()), 'Senha gerada.')
+            }
+          >
+            {faceStats?.has_secret ? 'Trocar senha do servidor' : 'Gerar senha do servidor'}
+          </button>
+        )}
+        <button
+          className="btn ghost small danger"
+          disabled={busy}
+          onClick={() => confirm('Apagar todos os dados de rosto e quem aparece em cada foto? Use depois da festa.') && run(async () => { await admin.wipeFaces(); setFaceStats(await admin.faceStats()) }, 'Dados de rosto apagados.')}
+        >
+          Apagar dados de rosto
+        </button>
       </section>
 
       <section className="panel admin-section">
