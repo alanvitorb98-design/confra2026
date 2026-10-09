@@ -368,6 +368,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .mission.hot .btn { grid-column: 1 / -1; justify-self: start; }
 .mission-badge { grid-column: 1 / -1; font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--gold-deep); }
 .mission.done { opacity: .55; }
+.mission-hint { grid-column: 1 / -1; font-size: 13px; color: var(--ink-2); }
+.mission-hint.miss { color: #a0441c; font-weight: 600; }
 .mission.next { opacity: .7; border-style: dashed; }
 .mission.all-done { text-align: center; grid-template-columns: 1fr; }
 .mission-progress { margin: -6px 0 12px; font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--gold-deep); }
@@ -548,7 +550,8 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
 .admin-missions li { display: grid; grid-template-columns: 1fr 64px auto; gap: 8px; align-items: center; }
 .admin-missions li > button { grid-column: 1 / -1; justify-self: end; }
 .admin-new { padding-top: 10px; border-top: 1px dashed var(--line); }
-.admin-new > button { grid-column: auto !important; }
+.admin-new > button { grid-column: 1 / -1 !important; justify-self: end; }
+.admin-target { grid-column: 1 / -1; }
 .admin-mini { display: flex; gap: 4px; align-items: center; font-size: 13px; color: var(--muted); }
 .admin-mini input { accent-color: var(--gold-deep); }
 .btn.danger { color: #b3261e; border-color: #b3261e55; }

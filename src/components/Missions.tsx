@@ -50,7 +50,10 @@ export function Missions({ missions, onShoot, locked, phase }: Props) {
             <span className="mission-badge">Missão {done.length + 1}</span>
             <span className="mission-title">{current.title}</span>
             <span className="mission-pts">+{current.points}</span>
-            <button className="btn primary small" onClick={() => onShoot(current.id)}>Tirar a foto</button>
+            {current.target && <span className="mission-hint">Vale quando o rosto de {current.target} aparecer na foto.</span>}
+            {current.status === 'checking' && <span className="mission-hint" role="status">Conferindo quem está na foto…</span>}
+            {current.status === 'missed' && <span className="mission-hint miss" role="status">Não encontrei {current.target ?? 'a pessoa'} na última foto. Tenta outra, com o rosto bem visível.</span>}
+            <button className="btn primary small" onClick={() => onShoot(current.id)}>{current.status ? 'Tirar outra' : 'Tirar a foto'}</button>
           </li>
         )}
         {left > 0 && (

@@ -57,6 +57,10 @@ export interface Mission {
   title: string
   points: number
   done: boolean
+  /** who has to appear in the photo */
+  target?: string
+  /** last photo for it: still being checked, or the person wasn't found */
+  status?: 'checking' | 'missed'
 }
 
 export interface RankEntry {
