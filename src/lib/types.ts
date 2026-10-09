@@ -35,6 +35,8 @@ export interface Photo {
   preview?: string
   /** The untouched camera file, for downloads */
   file?: File
+  /** Path of the original on R2 (read through the app's r2 function), when it isn't in url */
+  r2Path?: string
   /** Size of the original, for the download button */
   bytes?: number
   /** Names the face server recognized in the photo */

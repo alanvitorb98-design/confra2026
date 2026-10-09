@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
-import { admin, type AdminEvent, type MissionRow } from '../lib/backend'
+import { admin, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
 import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
 
@@ -45,6 +45,7 @@ export function AdminPanel({ missions, onClose }: Props) {
   const [adding, setAdding] = useState({ title: '', points: 30, target: '' })
   const [faceStats, setFaceStats] = useState<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>()
   const [faceSecret, setFaceSecret] = useState<string>()
+  const [r2, setR2] = useState<boolean>()
 
   const link = code ? `${APP_URL}?c=${encodeURIComponent(code)}` : ''
 
@@ -53,6 +54,7 @@ export function AdminPanel({ missions, onClose }: Props) {
     admin.code().then(setCode).catch(() => undefined)
     admin.stats().then(setStats).catch(() => undefined)
     admin.faceStats().then(setFaceStats).catch(() => undefined)
+    r2Status().then(setR2)
   }, [])
 
   useEffect(() => {
@@ -243,6 +245,32 @@ export function AdminPanel({ missions, onClose }: Props) {
           onClick={() => confirm('Apagar todos os dados de rosto e quem aparece em cada foto? Use depois da festa.') && run(async () => { await admin.wipeFaces(); setFaceStats(await admin.faceStats()) }, 'Dados de rosto apagados.')}
         >
           Apagar dados de rosto
+        </button>
+      </section>
+
+      <section className="panel admin-section">
+        <h3>Álbum</h3>
+        <p className="page-note">
+          {r2 === undefined ? 'Conferindo onde as fotos ficam…' : r2 ? 'Originais guardados no Cloudflare R2 (10 GB grátis).' : 'Originais no armazenamento do app (1 GB grátis) até o R2 ser configurado.'}
+        </p>
+        {r2 && (
+          <button className="btn ghost small" disabled={busy} onClick={() => run(r2Setup, 'R2 pronto pra receber fotos.')}>
+            Preparar R2
+          </button>
+        )}
+        <p className="page-note">Todas as fotos que estão no app, em qualidade cheia, em arquivos .zip de até 300 MB. Melhor fazer no computador.</p>
+        <button
+          className="btn primary wide"
+          disabled={busy}
+          onClick={() =>
+            run(async () => {
+              const { downloadAll } = await import('../lib/album')
+              const missing = await downloadAll((done, total) => setMsg(`Baixando ${done} de ${total}…`))
+              return missing
+            }, 'Pronto! Confere a pasta de downloads.')
+          }
+        >
+          Baixar todas as fotos
         </button>
       </section>
 
