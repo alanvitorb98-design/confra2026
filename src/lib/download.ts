@@ -1,3 +1,4 @@
+import { readOriginal } from './backend'
 import type { Photo } from './types'
 
 function fileName(photo: Photo, source: string) {
@@ -12,6 +13,10 @@ function fileName(photo: Photo, source: string) {
  */
 export async function savePhoto(photo: Photo) {
   if (photo.file) return shareOrDownload(new File([photo.file], fileName(photo, photo.file.name), { type: photo.file.type || 'image/jpeg' }))
+  if (photo.r2Path) {
+    const blob = await readOriginal(photo.r2Path)
+    return shareOrDownload(new File([blob], fileName(photo, photo.r2Path), { type: blob.type || 'image/jpeg' }))
+  }
   if (!photo.url) throw new Error('Foto sem arquivo original')
   const res = await fetch(photo.url)
   if (!res.ok) throw new Error('Falha ao baixar')

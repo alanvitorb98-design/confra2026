@@ -16,6 +16,42 @@ export const db = createClient(URL_, KEY, { auth: { persistSession: true, autoRe
 const LINK_TTL = 6 * 3600
 const LINK_REUSE_MS = 3 * 3600_000
 
+// Full-quality originals go to Cloudflare R2 (10 GB free) through the app's r2 function, once it is set up;
+// until then they stay in the bucket above.
+const R2_FN = `${URL_}/functions/v1/r2`
+let r2Ready: Promise<boolean> | null = null
+const r2On = () =>
+  (r2Ready ??= fetch(`${R2_FN}?op=status`)
+    .then((r) => r.json())
+    .then((j: { ready?: boolean }) => !!j.ready)
+    .catch(() => false))
+
+/** Asks the r2 function for a 10-minute link to put or get one original */
+async function r2Link(op: 'put' | 'get', path: string) {
+  const { data } = await db.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('sem login')
+  const res = await fetch(`${R2_FN}?op=${op}&path=${encodeURIComponent(path)}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, apikey: KEY } })
+  if (!res.ok) throw new Error(`r2 ${res.status}`)
+  return (await res.json()) as { url?: string; exists?: boolean }
+}
+
+/** Organizer: is R2 on, and let the app's site talk to the bucket */
+export const r2Status = () => r2On()
+export async function r2Setup() {
+  const { data } = await db.auth.getSession()
+  const res = await fetch(`${R2_FN}?op=setup`, { method: 'POST', headers: { Authorization: `Bearer ${data.session?.access_token}`, apikey: KEY } })
+  if (!res.ok) throw new Error('r2 setup')
+}
+
+/** The original of a photo stored on R2, as a file */
+export async function readOriginal(path: string) {
+  const { url } = await r2Link('get', path)
+  const res = await fetch(url!)
+  if (!res.ok) throw new Error('falha ao baixar')
+  return res.blob()
+}
+
 /** The event code from the invitation QR (?c=...), remembered on this phone. */
 const CODE_KEY = 'confra26.code'
 export function eventCode(): string {
@@ -165,6 +201,8 @@ interface PhotoRow {
   mission_id: string | null
   /** null while the face check of a mission that names someone is pending */
   mission_ok?: boolean | null
+  /** the original is on Cloudflare R2 instead of the bucket */
+  on_r2?: boolean
 }
 
 export interface MissionRow {
@@ -283,7 +321,7 @@ export function useParty(me: Guest | null) {
       }
       setGuests(new Map(g.data.map((x) => [x.id as string, x.name as string])))
       setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
-      void sign((p.data as PhotoRow[]).flatMap((x) => [x.preview_path, x.original_path]))
+      void sign((p.data as PhotoRow[]).flatMap((x) => (x.on_r2 ? [x.preview_path] : [x.preview_path, x.original_path])))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
       setState('live')
     }
@@ -295,7 +333,7 @@ export function useParty(me: Guest | null) {
         if (!row.id) return
         // someone who just joined: fetch the names again
         if (!guestsRef.current.has(row.guest_id)) loadGuests()
-        if (!row.removed_at) void sign([row.preview_path, row.original_path])
+        if (!row.removed_at) void sign(row.on_r2 ? [row.preview_path] : [row.preview_path, row.original_path])
         setRows((m) => {
           const next = new Map(m)
           if (row.removed_at) next.delete(row.id)
@@ -357,7 +395,9 @@ export function useParty(me: Guest | null) {
       frame: row.frame,
       tilt: row.tilt,
       takenAt: new Date(row.created_at),
-      url: l?.url ?? links.get(row.original_path),
+      // on screen an R2 original is stood in for by the preview; the download fetches the real file
+      url: l?.url ?? (row.on_r2 ? links.get(row.preview_path) : links.get(row.original_path)),
+      r2Path: row.on_r2 ? row.original_path : undefined,
       preview: l?.preview ?? links.get(row.preview_path),
       file: l?.file,
       bytes: row.bytes ?? l?.file.size,
@@ -473,7 +513,15 @@ export function useParty(me: Guest | null) {
       await up(row.preview_path, previewBlob, 'image/jpeg')
       // party photos also get a 1600px copy for the face server, deleted after it is read
       if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
-      await up(row.original_path, stored, stored.type || 'image/jpeg')
+      if (await r2On()) {
+        // straight to R2 with a short-lived link; the database notices the original isn't in its bucket
+        const { url, exists } = await r2Link('put', row.original_path)
+        if (!exists) {
+          const res = await fetch(url!, { method: 'PUT', body: stored, headers: { 'Content-Type': stored.type || 'image/jpeg' } })
+          if (!res.ok) throw new Error('r2 upload')
+        }
+        row = { ...row, on_r2: true }
+      } else await up(row.original_path, stored, stored.type || 'image/jpeg')
       const { error } = await db.rpc('send_photo', {
         p_id: row.id,
         p_kind: row.kind,
