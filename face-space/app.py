@@ -2,8 +2,11 @@
 
 Loop: ask the app's `faces` function for jobs, download each image from its short-lived link, find faces
 with InsightFace (buffalo_l: RetinaFace detection + ArcFace recognition) and send back the normalized
-512-number signatures. Images live only in memory. A tiny HTTP server answers health checks so the
-Space counts as running.
+512-number signatures. Images live only in memory.
+
+Runs on GitHub Actions (workflow "Face worker"): with RUN_MINUTES it works for that long and exits, and
+with DRAIN=1 it exits as soon as the queue is empty. Without either it runs forever with a tiny health
+server on port 7860 (for Docker hosting).
 """
 
 import os
@@ -121,6 +124,32 @@ class Health(BaseHTTPRequestHandler):
         pass
 
 
+def run_for(minutes, drain):
+    """GitHub Actions mode: work until the time is up (or the queue is empty with drain), then exit."""
+    if not SECRET:
+        print("FACE_SECRET missing")
+        raise SystemExit(1)
+    load_model()
+    end = time.time() + minutes * 60
+    idle, empty = 3, 0
+    while time.time() < end:
+        try:
+            n = work_once()
+            empty = 0 if n else empty + 1
+            idle = 3 if n else min(idle * 2, 20)
+        except Exception as e:
+            print("queue:", type(e).__name__, flush=True)
+            idle = 30
+        if drain and empty >= 2:
+            break
+        time.sleep(idle)
+    print(f"done: {status['done']} photos, {status['errors']} errors", flush=True)
+
+
 if __name__ == "__main__":
-    threading.Thread(target=loop, daemon=True).start()
-    HTTPServer(("0.0.0.0", 7860), Health).serve_forever()
+    minutes = float(os.environ.get("RUN_MINUTES") or 0)
+    if minutes:
+        run_for(minutes, os.environ.get("DRAIN") == "1")
+    else:
+        threading.Thread(target=loop, daemon=True).start()
+        HTTPServer(("0.0.0.0", 7860), Health).serve_forever()
