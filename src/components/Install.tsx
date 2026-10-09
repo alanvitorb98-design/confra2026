@@ -19,7 +19,7 @@ const isOpera = /opr\/|opera/i.test(ua)
 const isAndroidChrome = /android/i.test(ua) && /chrome\//i.test(ua) && !isSamsung && !isEdge && !isOpera && !/miuibrowser|yabrowser|ucbrowser/i.test(ua)
 
 /** Black screen shown in the browser before the intro: puts the app on the home screen first. */
-export function Install({ onSkip }: { onSkip: () => void }) {
+export function Install({ onSkip, code }: { onSkip: () => void; code?: string }) {
   const [prompt, setPrompt] = useState<InstallPromptEvent | null>(null)
   const [done, setDone] = useState(false)
 
@@ -111,6 +111,13 @@ export function Install({ onSkip }: { onSkip: () => void }) {
               </li>
             ))}
           </ol>
+        )}
+
+        {code && (
+          <p className="install-code">
+            Seu código do convite: <b>{code}</b>
+            <span>Anota aí: o app pode pedir quando abrir pelo ícone.</span>
+          </p>
         )}
 
         <p className="install-note">É grátis, não pede nenhuma permissão especial e não passa pela loja de apps.</p>

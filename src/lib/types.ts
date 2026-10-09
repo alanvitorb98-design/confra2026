@@ -13,8 +13,6 @@ export const FRAMES: { id: Frame; label: string }[] = [
 export interface Guest {
   /** Assigned by the server when the guest joins */
   id: string
-  /** Secret kept on this phone; the server only stores its hash */
-  token: string
   name: string
   instagram?: string
   /** Object URL of the selfie, when the guest opted in to face matching */

@@ -14,12 +14,14 @@ export default defineConfig({
         runtimeCaching: [
           {
             // feed previews never change once posted: keep them on the phone so each one downloads once
-            urlPattern: /^https:\/\/optapzbhyhklcirdoyid\.supabase\.co\/storage\/v1\/object\/public\/fotos\/.*-p\.jpg$/,
+            urlPattern: /^https:\/\/optapzbhyhklcirdoyid\.supabase\.co\/storage\/v1\/object\/sign\/fotos\/.*-p\.jpg\?/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'previews',
               expiration: { maxEntries: 600 },
               cacheableResponse: { statuses: [200] },
+              // signed links change on every refresh: cache by the file path, not the expiring token
+              plugins: [{ cacheKeyWillBeUsed: async ({ request }) => request.url.split('?')[0] }],
             },
           },
         ],
