@@ -37,6 +37,8 @@ export interface Photo {
   file?: File
   /** Size of the original, for the download button */
   bytes?: number
+  /** Names the face server recognized in the photo */
+  faces?: string[]
   /** Set when the photo was taken for a mission */
   missionId?: string
   /** Only on photos sent from this phone that have not reached the server yet */

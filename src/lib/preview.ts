@@ -3,7 +3,7 @@
  * while it animates, which is what makes the develop and the feed stutter. The original File
  * stays untouched for downloads and the story card.
  */
-export async function makePreview(file: File, width = 1080): Promise<string> {
+export async function makePreview(file: Blob, width = 1080): Promise<string> {
   try {
     const bitmap = await createImageBitmap(file, { resizeWidth: width, resizeQuality: 'high', imageOrientation: 'from-image' })
     const canvas = document.createElement('canvas')

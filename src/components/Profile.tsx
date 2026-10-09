@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Guest } from '../lib/types'
+import { FaceCard } from './FaceCard'
 import CountUp from './bits/CountUp'
 
 interface Props {
@@ -7,6 +8,7 @@ interface Props {
   myPhotos: number
   points: number
   onLeave: () => void
+  onGuest: (g: Guest) => void
   isAdmin: boolean
   onPanel: () => void
   /** organizer code: true when accepted */
@@ -41,7 +43,7 @@ function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPan
   )
 }
 
-export function Profile({ guest, myPhotos, points, onLeave, isAdmin, onPanel, onClaim }: Props) {
+export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, onPanel, onClaim }: Props) {
   return (
     <div className="page">
       <div className="profile">
@@ -53,11 +55,11 @@ export function Profile({ guest, myPhotos, points, onLeave, isAdmin, onPanel, on
           )}
         </div>
       </div>
-      <dl className="stats">
+      <dl className="stats two">
         <div><dt>Fotos</dt><dd><CountUp to={myPhotos} /></dd></div>
         <div><dt>Pontos</dt><dd><CountUp to={points} /></dd></div>
-        <div><dt>Rosto</dt><dd>{guest.faceOptIn ? 'Ligado' : 'Manual'}</dd></div>
       </dl>
+      <FaceCard guest={guest} onChange={onGuest} />
       {!standalone && (
         <div className="install">
           <b>Instale na tela inicial</b>
