@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Guest } from '../lib/types'
 import { FaceCard } from './FaceCard'
+import { VersionCard } from './VersionCard'
 import CountUp from './bits/CountUp'
 
 interface Props {
@@ -68,6 +69,7 @@ export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, on
       )}
       <Organizer isAdmin={isAdmin} onPanel={onPanel} onClaim={onClaim} />
       <button className="btn ghost wide" onClick={onLeave}>Sair</button>
+      <VersionCard />
     </div>
   )
 }

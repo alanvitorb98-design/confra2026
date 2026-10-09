@@ -2,15 +2,28 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// Build id: short commit on GitHub Actions, timestamp locally. Shipped in the bundle and in version.json,
+// so the app can tell whether a newer version is online.
+const VERSION = `${new Date().toISOString().slice(0, 16).replace('T', ' ')}${process.env.GITHUB_SHA ? ` · ${process.env.GITHUB_SHA.slice(0, 7)}` : ''}`
+
 // BASE_PATH lets the GitHub Pages build live under /confra2026/
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
+  define: { __APP_VERSION__: JSON.stringify(VERSION) },
   plugins: [
     react(),
+    {
+      name: 'version-file',
+      generateBundle() {
+        this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ version: VERSION }) })
+      },
+    },
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
       workbox: {
+        // version.json must always come from the network
+        globIgnores: ['**/version.json'],
         runtimeCaching: [
           {
             // feed previews never change once posted: keep them on the phone so each one downloads once

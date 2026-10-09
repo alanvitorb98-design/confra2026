@@ -556,3 +556,4 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .admin-secret { display: grid; gap: 8px; }
 .admin-secret code { word-break: break-all; padding: 10px; border-radius: 10px; background: #1d1a16; color: #f3cf6e; font-size: 12px; user-select: all; }
 .stats.two { grid-template-columns: repeat(2, 1fr); }
+.version { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); }
