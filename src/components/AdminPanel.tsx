@@ -219,7 +219,7 @@ export function AdminPanel({ missions, onClose }: Props) {
           <div className="admin-secret">
             <code>{faceSecret}</code>
             <p className="page-note">
-              Aparece só agora. No GitHub do app: Settings → Secrets and variables → Actions → New repository secret, nome <b>FACE_SECRET</b>, cola esse valor. Depois rode a ação "Face server".
+              Aparece só agora. No GitHub do app: Settings → Secrets and variables → Actions → New repository secret, nome <b>FACE_SECRET</b>, cola esse valor. O GitHub Actions roda o reconhecimento sozinho a cada meia hora e direto durante a festa.
             </p>
             <button className="btn ghost small" onClick={() => run(() => navigator.clipboard.writeText(faceSecret), 'Senha copiada.')}>Copiar senha</button>
           </div>

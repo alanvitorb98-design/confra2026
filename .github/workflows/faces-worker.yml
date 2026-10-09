@@ -1,0 +1,55 @@
+name: Face worker
+
+# Runs the face model (InsightFace, face-space/app.py) on GitHub's machines, free for public repos.
+# Every 30 minutes it clears the queue (selfies and stray photos) and stops. On the party day two long
+# runs cover 9h50 to about 21h30 Brasília, so photos are matched within seconds.
+# Needs the FACE_SECRET repository secret, generated in the app's organizer panel.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+    - cron: '50 12 7 11 *'
+    - cron: '40 18 7 11 *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Minutes to keep working (0 = stop when the queue is empty)'
+        default: '0'
+
+concurrency:
+  group: faces-worker
+  cancel-in-progress: false
+
+jobs:
+  work:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    env:
+      FACE_SECRET: ${{ secrets.FACE_SECRET }}
+    steps:
+      - name: Check the secret
+        id: secret
+        run: |
+          if [ -z "$FACE_SECRET" ]; then echo "::notice::Add the FACE_SECRET repository secret to run the face worker."; echo "ok=false" >> "$GITHUB_OUTPUT"; else echo "ok=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@v4
+        if: steps.secret.outputs.ok == 'true'
+      - uses: actions/setup-python@v5
+        if: steps.secret.outputs.ok == 'true'
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: face-space/requirements.txt
+      - uses: actions/cache@v4
+        if: steps.secret.outputs.ok == 'true'
+        with:
+          path: ~/.insightface
+          key: insightface-buffalo_l
+      - if: steps.secret.outputs.ok == 'true'
+        run: pip install -r face-space/requirements.txt
+      - name: Work
+        if: steps.secret.outputs.ok == 'true'
+        working-directory: face-space
+        env:
+          # long runs for the party (scheduled) or as asked; otherwise just clear the queue
+          RUN_MINUTES: ${{ (github.event.schedule == '50 12 7 11 *' || github.event.schedule == '40 18 7 11 *') && '345' || (inputs.minutes != '' && inputs.minutes != '0' && inputs.minutes) || '25' }}
+          DRAIN: ${{ (github.event.schedule == '50 12 7 11 *' || github.event.schedule == '40 18 7 11 *' || (inputs.minutes != '' && inputs.minutes != '0')) && '0' || '1' }}
+        run: python app.py
