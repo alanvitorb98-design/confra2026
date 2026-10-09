@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 // Everything about the party date lives here. Times are Brasília (-03:00).
 export const EVENT = {
   start: new Date('2026-11-07T10:00:00-03:00'),
-  end: new Date('2026-11-07T22:00:00-03:00'),
+  end: new Date('2026-11-07T20:00:00-03:00'),
   place: 'Local da confra',
   address: '',
   mapsUrl: 'https://maps.app.goo.gl/hyafsQ7ASH6v94wcA',
@@ -12,8 +12,11 @@ export const EVENT = {
 const HOUR = 3600_000
 /** The app opens one day before the party */
 export const APP_OPENS = new Date(EVENT.start.getTime() - 24 * HOUR)
-/** The outfit wall opens six hours before the party and closes when it starts */
-export const LOOK_OPENS = new Date(EVENT.start.getTime() - 6 * HOUR)
+/** The outfit wall: 7h to 12h on the party day, overlapping the first two hours of the party */
+export const LOOK_OPENS = new Date('2026-11-07T07:00:00-03:00')
+export const LOOK_CLOSES = new Date('2026-11-07T12:00:00-03:00')
+
+export const lookOpen = (now: number) => now >= LOOK_OPENS.getTime() && now < LOOK_CLOSES.getTime()
 
 export type Phase = 'countdown' | 'warmup' | 'look' | 'party' | 'after'
 

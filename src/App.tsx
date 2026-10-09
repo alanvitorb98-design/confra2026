@@ -12,7 +12,7 @@ import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Reaction, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
 import { PhaseBar } from './components/PhaseBar'
-import { phaseAt, testClock, useNow } from './lib/event'
+import { LOOK_CLOSES, clock, lookOpen, phaseAt, testClock, useNow } from './lib/event'
 import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
 import { Splash } from './components/Splash'
@@ -68,7 +68,9 @@ export default function App() {
   // before the party only the outfit wall exists; afterwards both, party first
   const showWall: Wall = phase === 'warmup' || phase === 'look' ? 'look' : wall
   const canShoot = phase === 'look' || phase === 'party'
-  const shootKind: Wall = phase === 'look' ? 'look' : 'party'
+  // while the outfit wall overlaps the party, the shutter posts to the wall on screen
+  const looksOpen = lookOpen(t)
+  const shootKind: Wall = phase === 'look' || (looksOpen && showWall === 'look' && tab === 'feed') ? 'look' : 'party'
 
   const shoot = () => canShoot && camera.current?.click()
 
@@ -116,11 +118,13 @@ export default function App() {
     .sort((a, b) => b.value - a.value)
   const empty =
     phase === 'warmup'
-      ? 'O Look da Confra abre 6 horas antes da festa. Já vai separando a roupa!'
+      ? 'O Look da Confra abre no dia da festa, às 7h. Já vai separando a roupa!'
       : phase === 'look'
         ? 'Ninguém postou o look ainda. Toca no botão e seja a primeira pessoa!'
         : showWall === 'look'
-          ? 'Ninguém postou look dessa vez.'
+          ? looksOpen
+            ? `Ainda dá tempo! Os looks ficam abertos até ${clock(LOOK_CLOSES)}.`
+            : 'Ninguém postou look dessa vez.'
           : 'Nenhuma foto ainda. Toca no botão e abre os trabalhos.'
 
   return (
@@ -169,7 +173,7 @@ export default function App() {
       <nav className="tabbar">
         <button aria-current={tab === 'feed'} onClick={() => setTab('feed')}>Feed</button>
         <button aria-current={tab === 'missions'} onClick={() => setTab('missions')}>Missões</button>
-        <button className="shutter" onClick={shoot} disabled={!canShoot} aria-label={phase === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
+        <button className="shutter" onClick={shoot} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
         <button aria-current={tab === 'ranking'} onClick={() => setTab('ranking')}>Ranking</button>
         <button aria-current={tab === 'me'} onClick={() => setTab('me')}>Eu</button>
       </nav>
