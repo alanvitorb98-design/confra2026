@@ -26,6 +26,7 @@ export const examplePhotos: Photo[] = [
     reactions: { ...zero(), '🔥': 14, '🕺': 6 },
     mine: {},
     tilt: -2,
+    frame: 'neon',
   },
   {
     id: 'ex2',
@@ -36,6 +37,7 @@ export const examplePhotos: Photo[] = [
     reactions: { ...zero(), '😂': 22, '😍': 3 },
     mine: {},
     tilt: 1.5,
+    frame: 'dark',
   },
   {
     id: 'ex3',
@@ -46,6 +48,7 @@ export const examplePhotos: Photo[] = [
     reactions: { ...zero(), '😍': 9, '🔥': 4 },
     mine: {},
     tilt: -1,
+    frame: 'chrome',
   },
 ]
 

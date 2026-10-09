@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { buzz, requestMotionPermission, useShake } from '../lib/motion'
 import { playReveal } from '../lib/sound'
+import { FRAMES, type Frame } from '../lib/types'
+import { frameClass } from '../lib/frame'
 
 interface Props {
   file: File
-  onPost: (caption: string) => void
+  onPost: (caption: string, frame: Frame) => void
   onDiscard: () => void
 }
 
@@ -22,6 +24,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
   const [stage, setStage] = useState<Stage>('zoom')
   const [progress, setProgress] = useState(0)
   const [caption, setCaption] = useState('')
+  const [frame, setFrame] = useState<Frame>('dark')
   const [canShake, setCanShake] = useState(motionAllowed)
   const holding = useRef(false)
   const raf = useRef(0)
@@ -94,7 +97,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
       </div>
 
       <figure
-        className="polaroid polaroid-dark develop-polaroid"
+        className={`${frameClass(frame)} develop-polaroid`}
         onPointerDown={startHold}
         onPointerUp={stopHold}
         onPointerLeave={stopHold}
@@ -127,8 +130,16 @@ export function Develop({ file, onPost, onDiscard }: Props) {
       <div className="develop-actions">
         {stage === 'done' ? (
           <>
+            <div className="frame-picker" role="radiogroup" aria-label="Moldura">
+              {FRAMES.map((f) => (
+                <button key={f.id} role="radio" aria-checked={frame === f.id} className={`frame-swatch swatch-${f.id}`} onClick={() => setFrame(f.id)}>
+                  <span aria-hidden />
+                  {f.label}
+                </button>
+              ))}
+            </div>
             <button className="btn ghost" onClick={onDiscard}>Descartar</button>
-            <button className="btn neon" onClick={() => onPost(caption.trim())}>Postar no feed</button>
+            <button className="btn neon" onClick={() => onPost(caption.trim(), frame)}>Postar no feed</button>
           </>
         ) : (
           <>

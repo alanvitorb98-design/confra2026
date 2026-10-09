@@ -1,4 +1,5 @@
 import type { Guest } from '../lib/types'
+import CountUp from './bits/CountUp'
 
 interface Props {
   guest: Guest
@@ -23,8 +24,8 @@ export function Profile({ guest, myPhotos, points, onLeave }: Props) {
         </div>
       </div>
       <dl className="stats">
-        <div><dt>Fotos</dt><dd>{myPhotos}</dd></div>
-        <div><dt>Pontos</dt><dd>{points}</dd></div>
+        <div><dt>Fotos</dt><dd><CountUp to={myPhotos} /></dd></div>
+        <div><dt>Pontos</dt><dd><CountUp to={points} /></dd></div>
         <div><dt>Rosto</dt><dd>{guest.faceOptIn ? 'Ligado' : 'Manual'}</dd></div>
       </dl>
       {!standalone && (

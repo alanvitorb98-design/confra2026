@@ -1,3 +1,4 @@
+import { AnimatePresence } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { Develop } from './components/Develop'
 import { Feed } from './components/Feed'
@@ -8,7 +9,8 @@ import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
 import { exampleAppearances, exampleMissions, examplePhotos, examplePoints } from './lib/mock'
 import { playShutter } from './lib/sound'
-import type { Guest, Photo, Reaction } from './lib/types'
+import type { Frame, Guest, Photo, Reaction } from './lib/types'
+import { Splash } from './components/Splash'
 
 type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
@@ -30,6 +32,7 @@ export default function App() {
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
   const camera = useRef<HTMLInputElement>(null)
+  const [intro, setIntro] = useState(true)
 
   useEffect(() => {
     if (!guest) return
@@ -41,20 +44,26 @@ export default function App() {
     }
   }, [guest])
 
+  if (intro)
+    return (
+      <AnimatePresence>
+        <Splash key="splash" onDone={() => setIntro(false)} />
+      </AnimatePresence>
+    )
   if (!guest) return <Welcome onEnter={setGuest} />
 
   const shoot = () => camera.current?.click()
 
-  const react = (id: string, r: Reaction) =>
+  const react = (id: string, r: Reaction, force = false) =>
     setPhotos((list) =>
       list.map((p) => {
-        if (p.id !== id) return p
+        if (p.id !== id || (force && p.mine[r])) return p
         const on = !p.mine[r]
         return { ...p, mine: { ...p.mine, [r]: on }, reactions: { ...p.reactions, [r]: p.reactions[r] + (on ? 1 : -1) } }
       }),
     )
 
-  const post = (caption: string) => {
+  const post = (caption: string, frame: Frame) => {
     if (!shot) return
     const photo: Photo = {
       id: crypto.randomUUID(),
@@ -62,10 +71,12 @@ export default function App() {
       caption,
       // the untouched original File: no resizing or recompression anywhere
       url: URL.createObjectURL(shot),
+      file: shot,
       takenAt: new Date(),
       reactions: { '🔥': 0, '😂': 0, '😍': 0, '🕺': 0 },
       mine: {},
       tilt: Math.round((Math.random() * 4 - 2) * 10) / 10,
+      frame,
     }
     setPhotos((list) => [photo, ...list])
     setShot(null)
