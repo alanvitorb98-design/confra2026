@@ -7,22 +7,62 @@ const URL_ = 'https://optapzbhyhklcirdoyid.supabase.co'
 const KEY = 'sb_publishable_9PN8BMaKHBKkCdmIylVa-w_ajGUMRv3'
 const BUCKET = 'fotos'
 
-export const db = createClient(URL_, KEY, { auth: { persistSession: false } })
+// The login session stays on the phone, so a guest signs in once.
+export const db = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'confra26.session' } })
 
-const publicUrl = (path: string) => db.storage.from(BUCKET).getPublicUrl(path).data.publicUrl
+// Photos live in a private bucket: the app asks for links that expire, so a leaked link stops working.
+const LINK_TTL = 6 * 3600
+const LINK_REUSE_MS = 3 * 3600_000
 
-function newToken() {
-  const bytes = crypto.getRandomValues(new Uint8Array(24))
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+/** The event code from the invitation QR (?c=...), remembered on this phone. */
+const CODE_KEY = 'confra26.code'
+export function eventCode(): string {
+  try {
+    const q = new URLSearchParams(location.search).get('c')
+    if (q) {
+      localStorage.setItem(CODE_KEY, q)
+      const url = new URL(location.href)
+      url.searchParams.delete('c')
+      history.replaceState(null, '', url)
+    }
+    return localStorage.getItem(CODE_KEY) ?? ''
+  } catch {
+    return ''
+  }
 }
 
-/** Signs the guest in (or updates their profile) and returns them with their id and secret token. */
-export async function join(g: Omit<Guest, 'id' | 'token'> & { token?: string }): Promise<Guest> {
-  const token = g.token ?? newToken()
-  const { data, error } = await db.rpc('join_party', { p_token: token, p_name: g.name, p_instagram: g.instagram ?? '', p_face: g.faceOptIn })
-  if (error) throw error
-  return { ...g, id: data as string, token }
+export class JoinError extends Error {
+  constructor(public reason: 'code' | 'busy' | 'other') {
+    super(reason)
+  }
 }
+
+/** Checks the event code on the server, which creates the guest's login. */
+export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
+  const { data, error } = await db.functions.invoke('join', {
+    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn },
+  })
+  if (error) {
+    const status = (error as { context?: Response }).context?.status
+    throw new JoinError(status === 403 ? 'code' : status === 429 ? 'busy' : 'other')
+  }
+  const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
+  if (sessionError) throw new JoinError('other')
+  try {
+    localStorage.setItem(CODE_KEY, code)
+  } catch {
+    /* private mode */
+  }
+  return { ...g, id: data.guest_id as string }
+}
+
+/** True when this phone still has a login (it can be lost if the browser clears its data). */
+export async function hasSession() {
+  const { data } = await db.auth.getSession()
+  return !!data.session
+}
+
+export const leave = () => db.auth.signOut()
 
 interface PhotoRow {
   id: string
@@ -60,7 +100,7 @@ export type LiveState = 'loading' | 'live' | 'offline'
 
 /**
  * The whole party, live: photos, looks and reactions from everyone, kept in sync over a realtime channel.
- * Reads go straight to the tables; writes go through database functions that check the guest's token.
+ * Only signed-in guests can read; writes go through database functions that check who is calling.
  */
 export function useParty(me: Guest | null) {
   const [guests, setGuests] = useState<Map<string, string>>(new Map())
@@ -69,6 +109,8 @@ export function useParty(me: Guest | null) {
   const [local, setLocal] = useState<Map<string, Local>>(new Map())
   const [state, setState] = useState<LiveState>('loading')
   const [reload, setReload] = useState(0)
+  const [links, setLinks] = useState<Map<string, string>>(new Map())
+  const signedAt = useRef(new Map<string, number>())
   const localRef = useRef(local)
   localRef.current = local
   const guestsRef = useRef(guests)
@@ -79,6 +121,23 @@ export function useParty(me: Guest | null) {
     let alive = true
     let subscribedOnce = false
     let socketUp = false
+
+    const sign = async (paths: string[]) => {
+      const now = Date.now()
+      const due = paths.filter((p) => now - (signedAt.current.get(p) ?? 0) > LINK_REUSE_MS)
+      if (!due.length) return
+      const { data } = await db.storage.from(BUCKET).createSignedUrls(due, LINK_TTL)
+      if (!alive || !data) return
+      setLinks((m) => {
+        const next = new Map(m)
+        for (const d of data) {
+          if (!d.signedUrl || !d.path) continue
+          next.set(d.path, d.signedUrl)
+          signedAt.current.set(d.path, now)
+        }
+        return next
+      })
+    }
 
     const loadGuests = async () => {
       const { data } = await db.from('guests').select('id,name')
@@ -98,6 +157,7 @@ export function useParty(me: Guest | null) {
       }
       setGuests(new Map(g.data.map((x) => [x.id as string, x.name as string])))
       setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
+      void sign((p.data as PhotoRow[]).flatMap((x) => [x.preview_path, x.original_path]))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
       setState('live')
     }
@@ -109,6 +169,7 @@ export function useParty(me: Guest | null) {
         if (!row.id) return
         // someone who just joined: fetch the names again
         if (!guestsRef.current.has(row.guest_id)) loadGuests()
+        if (!row.removed_at) void sign([row.preview_path, row.original_path])
         setRows((m) => {
           const next = new Map(m)
           if (row.removed_at) next.delete(row.id)
@@ -165,8 +226,8 @@ export function useParty(me: Guest | null) {
       frame: row.frame,
       tilt: row.tilt,
       takenAt: new Date(row.created_at),
-      url: l?.url ?? publicUrl(row.original_path),
-      preview: l?.preview ?? publicUrl(row.preview_path),
+      url: l?.url ?? links.get(row.original_path),
+      preview: l?.preview ?? links.get(row.preview_path),
       file: l?.file,
       bytes: row.bytes ?? l?.file.size,
       status: l?.status === 'sent' ? undefined : l?.status,
@@ -185,7 +246,7 @@ export function useParty(me: Guest | null) {
     return [...all.values()]
       .filter((p) => p.kind !== 'look' || latestLook.get(p.authorId!) === p)
       .sort((a, b) => b.takenAt.getTime() - a.takenAt.getTime())
-  }, [rows, reactions, guests, local, me?.id, me?.name])
+  }, [rows, reactions, guests, local, links, me?.id, me?.name])
 
   const react = async (photoId: string, emoji: Reaction, force = false) => {
     if (!me) return
@@ -194,7 +255,7 @@ export function useParty(me: Guest | null) {
     if (force && was) return
     const optimistic = { photo_id: photoId, guest_id: me.id, emoji, active: force || !was }
     setReactions((m) => new Map(m).set(key, optimistic))
-    const { data, error } = await db.rpc('toggle_reaction', { p_token: me.token, p_photo: photoId, p_emoji: emoji, p_force: force })
+    const { data, error } = await db.rpc('react', { p_photo: photoId, p_emoji: emoji, p_force: force })
     setReactions((m) => new Map(m).set(key, { ...optimistic, active: error ? was : (data as boolean) }))
   }
 
@@ -211,8 +272,7 @@ export function useParty(me: Guest | null) {
       }
       await up(row.preview_path, previewBlob, 'image/jpeg')
       await up(row.original_path, file, file.type || 'image/jpeg')
-      const { error } = await db.rpc('post_photo', {
-        p_token: me.token,
+      const { error } = await db.rpc('share_photo', {
         p_id: row.id,
         p_kind: row.kind,
         p_caption: row.caption,

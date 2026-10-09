@@ -8,7 +8,7 @@ import { Ranking } from './components/Ranking'
 import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
 import { exampleAppearances, exampleMissions, examplePoints } from './lib/mock'
-import { join, useParty } from './lib/backend'
+import { eventCode, hasSession, join, leave, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
@@ -28,8 +28,8 @@ function loadGuest(): Guest | null {
   try {
     const raw = localStorage.getItem(GUEST_KEY)
     const g = raw ? (JSON.parse(raw) as Guest) : null
-    // profiles saved before the server existed have no id: sign in again
-    return g?.id && g.token ? g : null
+    // profiles saved before logins existed have no id: sign in again
+    return g?.id ? g : null
   } catch {
     return null
   }
@@ -42,12 +42,19 @@ export default function App() {
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
   const camera = useRef<HTMLInputElement>(null)
+  const [code] = useState(eventCode)
   const [intro, setIntro] = useState(true)
   const [gate, setGate] = useState(() => !isInstalled())
   const t = useNow()
   const phase = phaseAt(t)
   const party = useParty(guest && phase !== 'countdown' ? guest : null)
   const photos = party.photos
+
+  // the browser can clear the login: then the guest signs in again with the code
+  useEffect(() => {
+    if (guest) hasSession().then((ok) => !ok && setGuest(null))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     if (!guest) return
@@ -59,7 +66,7 @@ export default function App() {
     }
   }, [guest])
 
-  if (gate) return <Install onSkip={() => setGate(false)} />
+  if (gate) return <Install code={code} onSkip={() => setGate(false)} />
   if (intro)
     return (
       <AnimatePresence>
@@ -67,7 +74,7 @@ export default function App() {
       </AnimatePresence>
     )
   if (phase === 'countdown') return <Countdown />
-  if (!guest) return <Welcome onEnter={async (g) => setGuest(await join(g))} />
+  if (!guest) return <Welcome code={code} onEnter={async (c, g) => setGuest(await join(c, g))} />
 
   // before the party only the outfit wall exists; afterwards both, party first
   const showWall: Wall = phase === 'warmup' || phase === 'look' ? 'look' : wall
@@ -148,6 +155,7 @@ export default function App() {
             points={0}
             onLeave={() => {
               try { localStorage.removeItem(GUEST_KEY) } catch { /* ignore */ }
+              void leave()
               setGuest(null)
             }}
           />
