@@ -35,8 +35,6 @@ interface Props {
 /** Organizer-only settings. The database checks the organizer flag again on every call. */
 export function AdminPanel({ missions, onClose }: Props) {
   const [ev, setEv] = useState<AdminEvent>()
-  const [code, setCode] = useState('')
-  const [newCode, setNewCode] = useState('')
   const [qr, setQr] = useState<string>()
   const [stats, setStats] = useState<{ guests: number; photos: number; bytes: number }>()
   const [msg, setMsg] = useState<string>()
@@ -47,11 +45,10 @@ export function AdminPanel({ missions, onClose }: Props) {
   const [faceSecret, setFaceSecret] = useState<string>()
   const [r2, setR2] = useState<boolean>()
 
-  const link = code ? `${APP_URL}?c=${encodeURIComponent(code)}` : ''
+  const link = APP_URL
 
   useEffect(() => {
     admin.event().then(setEv).catch(() => setMsg('Não consegui carregar as configurações.'))
-    admin.code().then(setCode).catch(() => undefined)
     admin.stats().then(setStats).catch(() => undefined)
     admin.faceStats().then(setFaceStats).catch(() => undefined)
     r2Status().then(setR2)
@@ -115,24 +112,12 @@ export function AdminPanel({ missions, onClose }: Props) {
 
       <section className="panel admin-section">
         <h3>Convite</h3>
-        <p className="page-note">Só entra quem abre por esse QR (ou digita o código). Imprime no convite ou manda no grupo.</p>
+        <p className="page-note">Qualquer pessoa com o link ou o QR entra, sem código. Imprime no convite ou manda no grupo.</p>
         {qr && <img className="admin-qr" src={qr} alt={`QR code para ${link}`} />}
-        <code className="admin-code">{code || '…'}</code>
         <div className="admin-row">
           <button className="btn primary small" onClick={downloadQr} disabled={!qr}>Baixar QR</button>
           <button className="btn ghost small" onClick={() => run(() => navigator.clipboard.writeText(link), 'Link copiado.')} disabled={!link}>Copiar link</button>
         </div>
-        <label className="field">
-          <span>Trocar código <em>o QR antigo para de funcionar</em></span>
-          <input value={newCode} onChange={(e) => setNewCode(e.target.value.toUpperCase())} placeholder="CONFRA-XXXXX" autoCapitalize="characters" />
-        </label>
-        <button
-          className="btn ghost small"
-          disabled={busy || newCode.replace(/[^A-Z0-9]/g, '').length < 6}
-          onClick={() => run(async () => { await admin.setCode(newCode); setCode(newCode.trim()); setNewCode('') }, 'Código trocado. Gera o QR de novo.')}
-        >
-          Salvar código
-        </button>
       </section>
 
       {ev && (

@@ -59,7 +59,7 @@ export function Countdown() {
       <Reminders />
 
       {!EVENT.place ? (
-        <p className="cd-note">O local aparece quando você abre pelo QR do convite.</p>
+        <p className="cd-note">O local aparece aqui em breve.</p>
       ) : (
       <AnimatePresence mode="wait" initial={false}>
         {place ? (
