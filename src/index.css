@@ -507,3 +507,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* upload state under the top card */
+.feed-status { font-size: 14px; color: var(--muted); background: none; border: 0; padding: 0; font: inherit; }
+.feed-status.failed { color: #b3261e; text-decoration: underline; cursor: pointer; }
+.form-error { margin: 0; color: #b3261e; font-size: 14px; text-align: center; }

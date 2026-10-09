@@ -1,7 +1,7 @@
 import type { Photo } from './types'
 
-function fileName(photo: Photo, file: File) {
-  const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : '.jpg'
+function fileName(photo: Photo, source: string) {
+  const ext = /\.[a-z0-9]{2,5}$/i.exec(source)?.[0] ?? '.jpg'
   const stamp = photo.takenAt.toISOString().slice(0, 16).replace(/[-:T]/g, '')
   return `confra26-${photo.author.toLowerCase().replace(/\s+/g, '-')}-${stamp}${ext}`
 }
@@ -11,8 +11,12 @@ function fileName(photo: Photo, file: File) {
  * the way to reach "Save to Photos"; elsewhere it falls back to a download.
  */
 export async function savePhoto(photo: Photo) {
-  if (!photo.file) throw new Error('Foto sem arquivo original')
-  return shareOrDownload(new File([photo.file], fileName(photo, photo.file), { type: photo.file.type || 'image/jpeg' }))
+  if (photo.file) return shareOrDownload(new File([photo.file], fileName(photo, photo.file.name), { type: photo.file.type || 'image/jpeg' }))
+  if (!photo.url) throw new Error('Foto sem arquivo original')
+  const res = await fetch(photo.url)
+  if (!res.ok) throw new Error('Falha ao baixar')
+  const blob = await res.blob()
+  return shareOrDownload(new File([blob], fileName(photo, new URL(photo.url).pathname), { type: blob.type || 'image/jpeg' }))
 }
 
 export async function shareOrDownload(file: File): Promise<'shared' | 'downloaded' | 'cancelled'> {

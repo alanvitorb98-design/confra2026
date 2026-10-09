@@ -10,6 +10,20 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      workbox: {
+        runtimeCaching: [
+          {
+            // feed previews never change once posted: keep them on the phone so each one downloads once
+            urlPattern: /^https:\/\/optapzbhyhklcirdoyid\.supabase\.co\/storage\/v1\/object\/public\/fotos\/.*-p\.jpg$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'previews',
+              expiration: { maxEntries: 600 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
+      },
       manifest: {
         name: 'Confra da Firma',
         short_name: 'Confra',

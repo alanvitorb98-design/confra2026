@@ -27,17 +27,17 @@ export function Viewer({ photo, onClose }: { photo: Photo; onClose: () => void }
   return (
     <motion.div className="viewer" onClick={onClose} role="dialog" aria-label="Foto em tela cheia" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
       <motion.div className="viewer-photo" initial={{ scale: 0.92 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 260, damping: 24 }}>
-        {photo.url ? <img src={photo.url} alt={photo.caption} /> : <span className="ph" style={{ background: photo.placeholder }} />}
+        {photo.url ? <img src={photo.preview ?? photo.url} alt={photo.caption} crossOrigin="anonymous" /> : <span className="ph" style={{ background: photo.placeholder }} />}
       </motion.div>
       <div className="viewer-bar" onClick={(e) => e.stopPropagation()}>
         <div className="viewer-text">
           <span>{photo.caption}</span>
           <span className="viewer-author">por {photo.author}</span>
         </div>
-        {photo.file ? (
+        {photo.url ? (
           <div className="viewer-actions">
             <button className="btn ghost small" disabled={busy} onClick={() => run(() => savePhoto(photo))}>
-              Baixar original · {size(photo.file.size)}
+              Baixar original{photo.bytes ? ` · ${size(photo.bytes)}` : ''}
             </button>
             <button className="btn primary small" disabled={busy} onClick={() => run(async () => shareOrDownload(await makeStory(photo)))}>
               {busy ? 'Montando…' : 'Postar no Story'}

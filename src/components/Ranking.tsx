@@ -32,7 +32,7 @@ export function Ranking({ points, appearances, looks }: Props) {
           </li>
         ))}
       </ol>
-      <p className="page-note">Dados de exemplo até o app ser ligado ao servidor.</p>
+      {tab !== 'looks' && <p className="page-note">Exemplo: o ranking de missões e de quem mais aparece começa junto com a festa.</p>}
     </div>
   )
 }
