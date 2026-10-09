@@ -3,6 +3,7 @@ import { JoinError } from '../lib/backend'
 import type { Guest } from '../lib/types'
 import { Logo } from './Logo'
 import { PartyScene } from './PartyScene'
+import { SelfieCam } from './SelfieCam'
 
 type NewGuest = Omit<Guest, 'id'>
 
@@ -11,6 +12,7 @@ export function Welcome({ code, onEnter }: { code: string; onEnter: (code: strin
   const [instagram, setInstagram] = useState('')
   const [faceOptIn, setFaceOptIn] = useState(true)
   const [selfieUrl, setSelfieUrl] = useState<string>()
+  const [cam, setCam] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>()
 
@@ -18,6 +20,7 @@ export function Welcome({ code, onEnter }: { code: string; onEnter: (code: strin
     if (!f) return
     if (selfieUrl) URL.revokeObjectURL(selfieUrl)
     setSelfieUrl(URL.createObjectURL(f))
+    setCam(false)
   }
 
   const ready = name.trim().length > 1 && (!faceOptIn || selfieUrl)
@@ -67,17 +70,17 @@ export function Welcome({ code, onEnter }: { code: string; onEnter: (code: strin
             <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>
           </div>
           {faceOptIn && (
-            <label className="selfie">
-              <input id="selfie" type="file" accept="image/*" capture="user" onChange={(e) => pickSelfie(e.target.files?.[0])} hidden />
+            <button type="button" className="selfie" onClick={() => setCam(true)}>
               {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty">+</span>}
               <span>{selfieUrl ? 'Trocar selfie' : 'Tirar minha selfie'}</span>
-            </label>
+            </button>
           )}
         </div>
 
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="btn primary wide" disabled={!ready || busy}>{busy ? 'Entrando…' : 'Entrar na festa'}</button>
       </form>
+      {cam && <SelfieCam onShot={pickSelfie} onClose={() => setCam(false)} />}
     </div>
   )
 }
