@@ -12,56 +12,62 @@ function loadImage(src: string) {
   })
 }
 
+function burst(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rays: number) {
+  ctx.save()
+  ctx.translate(x, y)
+  ctx.strokeStyle = '#d9a52b'
+  ctx.fillStyle = '#f6d77c'
+  ctx.lineCap = 'round'
+  ctx.lineWidth = r * 0.05
+  for (let i = 0; i < rays; i++) {
+    const a = (i / rays) * Math.PI * 2
+    const long = i % 2 === 0
+    const r1 = r * (long ? 0.34 : 0.4)
+    const r2 = r * (long ? 0.88 : 0.7)
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(a) * r1, Math.sin(a) * r1)
+    ctx.lineTo(Math.cos(a) * r2, Math.sin(a) * r2)
+    ctx.stroke()
+    if (long) {
+      ctx.beginPath()
+      ctx.arc(Math.cos(a) * (r2 + r * 0.07), Math.sin(a) * (r2 + r * 0.07), r * 0.045, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  ctx.restore()
+}
+
+// Cream paper with gold confetti and fireworks, like the invitation
 function drawBackdrop(ctx: CanvasRenderingContext2D) {
-  const sky = ctx.createLinearGradient(0, 0, 0, H)
-  sky.addColorStop(0, '#120a24')
-  sky.addColorStop(0.55, '#3a1670')
-  sky.addColorStop(0.72, '#2a0f45')
-  sky.addColorStop(1, '#120a24')
-  ctx.fillStyle = sky
+  const paper = ctx.createLinearGradient(0, 0, 0, H)
+  paper.addColorStop(0, '#fcf5de')
+  paper.addColorStop(0.5, '#fbf3d9')
+  paper.addColorStop(1, '#f6e8bd')
+  ctx.fillStyle = paper
   ctx.fillRect(0, 0, W, H)
 
-  // sliced sun on the horizon
-  const horizon = H * 0.74
-  const r = 360
-  const sun = ctx.createLinearGradient(0, horizon - r, 0, horizon)
-  sun.addColorStop(0, '#ffe66d')
-  sun.addColorStop(0.5, '#ffb13d')
-  sun.addColorStop(1, '#ff3d9a')
-  ctx.save()
-  ctx.beginPath()
-  ctx.arc(W / 2, horizon, r, Math.PI, 0)
-  ctx.clip()
-  ctx.shadowColor = '#ff3d9a'
-  ctx.shadowBlur = 80
-  ctx.fillStyle = sun
-  ctx.fillRect(W / 2 - r, horizon - r, r * 2, r)
-  ctx.fillStyle = '#2a0f45'
-  for (let i = 0; i < 5; i++) ctx.fillRect(0, horizon - 150 + i * 32, W, 6 + i * 3)
-  ctx.restore()
+  burst(ctx, W / 2, 0, 300, 18)
+  burst(ctx, W, 420, 220, 14)
+  burst(ctx, 0, 380, 200, 12)
+  burst(ctx, 90, H - 200, 230, 16)
+  burst(ctx, W - 110, H - 230, 260, 18)
 
-  // neon grid floor
-  ctx.fillStyle = '#120a24'
-  ctx.fillRect(0, horizon, W, H - horizon)
-  ctx.strokeStyle = 'rgba(56,225,255,.6)'
-  ctx.lineWidth = 3
-  for (let i = -12; i <= 12; i++) {
+  const dots: [number, number, number, boolean][] = [
+    [70, 160, 34, false], [250, 90, 18, true], [930, 300, 44, true], [1020, 760, 20, false], [40, 700, 22, true],
+    [980, 1180, 30, false], [60, 1300, 18, false], [500, H - 60, 52, true], [800, 1700, 22, true], [330, 1760, 16, false],
+  ]
+  for (const [x, y, r, pale] of dots) {
+    const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 1, x, y, r)
+    g.addColorStop(0, pale ? '#f8e6ad' : '#fbe7a4')
+    g.addColorStop(1, pale ? '#f0d68a' : '#c4911a')
+    ctx.fillStyle = g
     ctx.beginPath()
-    ctx.moveTo(W / 2 + i * 30, horizon)
-    ctx.lineTo(W / 2 + i * 260, H)
-    ctx.stroke()
-  }
-  ctx.strokeStyle = 'rgba(255,61,154,.6)'
-  for (let i = 0; i < 9; i++) {
-    const y = horizon + Math.pow(i / 8, 2) * (H - horizon)
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(W, y)
-    ctx.stroke()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
   }
 }
 
-/** Builds a 1080x1920 story card: the photo in its Polaroid over the synth horizon. */
+/** Builds a 1080x1920 story card: the photo in its Polaroid on the invitation paper. */
 export async function makeStory(photo: Photo): Promise<File> {
   await document.fonts.ready
   const canvas = document.createElement('canvas')
@@ -70,20 +76,13 @@ export async function makeStory(photo: Photo): Promise<File> {
   const ctx = canvas.getContext('2d')!
   drawBackdrop(ctx)
 
-  // logo
+  // invitation title
   ctx.textAlign = 'center'
-  ctx.font = '120px Audiowide, sans-serif'
-  ctx.shadowColor = 'rgba(255,61,154,.8)'
-  ctx.shadowBlur = 40
-  const chrome = ctx.createLinearGradient(0, 120, 0, 250)
-  chrome.addColorStop(0, '#ffffff')
-  chrome.addColorStop(0.45, '#cfd6ff')
-  chrome.addColorStop(0.5, '#5b3a9e')
-  chrome.addColorStop(0.55, '#ffd6f0')
-  chrome.addColorStop(1, '#ffffff')
-  ctx.fillStyle = chrome
-  ctx.fillText('CONFRA 26', W / 2, 240)
-  ctx.shadowBlur = 0
+  ctx.fillStyle = '#1d1a16'
+  ctx.font = '84px Gloock, Georgia, serif'
+  ctx.fillText('CONFRA', W / 2, 170)
+  ctx.font = '128px Gloock, Georgia, serif'
+  ctx.fillText('DA FIRMA', W / 2, 290)
 
   // polaroid
   const pw = 820
@@ -97,30 +96,26 @@ export async function makeStory(photo: Photo): Promise<File> {
   ctx.translate(W / 2, py + ph / 2)
   ctx.rotate((photo.tilt * Math.PI) / 180)
   ctx.translate(-W / 2, -(py + ph / 2))
-  ctx.shadowColor = 'rgba(0,0,0,.7)'
+  ctx.shadowColor = 'rgba(60,40,10,.45)'
   ctx.shadowBlur = 60
   ctx.shadowOffsetY = 30
   const frame = ctx.createLinearGradient(0, py, 0, py + ph)
-  if (photo.frame === 'chrome') {
-    frame.addColorStop(0, '#f4f5fb')
-    frame.addColorStop(0.45, '#b9bdd0')
-    frame.addColorStop(0.55, '#6f7390')
-    frame.addColorStop(1, '#d9dcea')
+  if (photo.frame === 'gold') {
+    frame.addColorStop(0, '#fbe8a6')
+    frame.addColorStop(0.4, '#e0b448')
+    frame.addColorStop(0.52, '#a8790f')
+    frame.addColorStop(0.64, '#e9c565')
+    frame.addColorStop(1, '#c9971f')
+  } else if (photo.frame === 'dark') {
+    frame.addColorStop(0, '#2b2621')
+    frame.addColorStop(1, '#1a1714')
   } else {
-    frame.addColorStop(0, '#2a2330')
-    frame.addColorStop(1, '#1a1520')
+    frame.addColorStop(0, '#fffdf7')
+    frame.addColorStop(1, '#f1ece0')
   }
   ctx.fillStyle = frame
   ctx.fillRect(px, py, pw, ph)
   ctx.shadowColor = 'transparent'
-  if (photo.frame === 'neon') {
-    ctx.strokeStyle = '#ff3d9a'
-    ctx.lineWidth = 6
-    ctx.shadowColor = '#ff3d9a'
-    ctx.shadowBlur = 40
-    ctx.strokeRect(px + 3, py + 3, pw - 6, ph - 6)
-    ctx.shadowBlur = 0
-  }
 
   // photo, cropped to fill 4:5 at full source resolution
   if (photo.url) {
@@ -136,9 +131,9 @@ export async function makeStory(photo: Photo): Promise<File> {
 
   // caption + date stamp
   ctx.textAlign = 'left'
-  ctx.font = '64px "Permanent Marker", cursive'
-  ctx.fillStyle = photo.frame === 'chrome' ? '#2a2340' : photo.frame === 'neon' ? '#ffd6ec' : '#e9e2f5'
-  ctx.fillText(photo.caption || 'confra 26', px + pad + 6, py + pad + photoH + 120, photoW - 12)
+  ctx.font = '700 84px Caveat, cursive'
+  ctx.fillStyle = photo.frame === 'gold' ? '#3a2a08' : photo.frame === 'dark' ? '#f1e9d6' : '#2a241c'
+  ctx.fillText(photo.caption || 'confra da firma', px + pad + 6, py + pad + photoH + 120, photoW - 12)
   ctx.font = 'bold 36px "Courier New", monospace'
   ctx.fillStyle = '#ff9a3d'
   ctx.shadowColor = 'rgba(255,120,30,.9)'
@@ -148,11 +143,9 @@ export async function makeStory(photo: Photo): Promise<File> {
   ctx.restore()
 
   ctx.textAlign = 'center'
-  ctx.font = '600 40px "Chakra Petch", sans-serif'
-  ctx.fillStyle = '#38e1ff'
-  ctx.shadowColor = 'rgba(56,225,255,.8)'
-  ctx.shadowBlur = 16
-  ctx.fillText(`por ${photo.author}`, W / 2, py + ph + 110)
+  ctx.font = '600 40px Outfit, sans-serif'
+  ctx.fillStyle = '#a5770f'
+  ctx.fillText(`por ${photo.author} · 07/11`, W / 2, py + ph + 110)
 
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas'))), 'image/jpeg', 0.95))
   return new File([blob], `confra26-story-${photo.id.slice(0, 8)}.jpg`, { type: 'image/jpeg' })

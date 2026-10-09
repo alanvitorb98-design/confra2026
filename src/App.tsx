@@ -13,7 +13,8 @@ import type { Frame, Guest, Photo, Reaction } from './lib/types'
 import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
 import { Splash } from './components/Splash'
-import { SynthScene } from './components/SynthScene'
+import { Logo } from './components/Logo'
+import { PartyScene } from './components/PartyScene'
 
 type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
@@ -78,7 +79,7 @@ export default function App() {
       url: URL.createObjectURL(shot),
       file: shot,
       takenAt: new Date(),
-      reactions: { '🔥': 0, '😂': 0, '😍': 0, '🕺': 0 },
+      reactions: { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
       mine: {},
       tilt: Math.round((Math.random() * 4 - 2) * 10) / 10,
       frame,
@@ -93,10 +94,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <SynthScene variant="ambient" />
+      <PartyScene variant="ambient" />
 
       <header className="topbar">
-        <h1 className="logo small">CONFRA<span>26</span></h1>
+        <Logo small />
         <span className="topbar-count">{photos.length} fotos</span>
       </header>
 

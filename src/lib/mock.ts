@@ -14,25 +14,25 @@ const party = (a: string, b: string, c: string) =>
     `linear-gradient(170deg, ${c}, #140c1c)`,
   ].join(',')
 
-const zero = () => ({ '🔥': 0, '😂': 0, '😍': 0, '🕺': 0 })
+const zero = () => ({ '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 })
 
 export const examplePhotos: Photo[] = [
   {
     id: 'ex1',
     author: 'Marina',
     caption: 'a mesa do RH dominou a pista',
-    placeholder: party('#ffd23f', '#ff4f9a', '#5b2a6e'),
+    placeholder: party('#ffd23f', '#fff1c4', '#6b4a24'),
     takenAt: new Date('2026-11-07T21:42:00'),
-    reactions: { ...zero(), '🔥': 14, '🕺': 6 },
+    reactions: { ...zero(), '🔥': 14, '🥂': 6 },
     mine: {},
     tilt: -2,
-    frame: 'neon',
+    frame: 'classic',
   },
   {
     id: 'ex2',
     author: 'Rodrigo',
     caption: 'amigo oculto mais caótico da história',
-    placeholder: party('#38e1ff', '#ffd23f', '#1f3a6e'),
+    placeholder: party('#f6d77c', '#ffffff', '#3d2c1c'),
     takenAt: new Date('2026-11-07T21:15:00'),
     reactions: { ...zero(), '😂': 22, '😍': 3 },
     mine: {},
@@ -43,12 +43,12 @@ export const examplePhotos: Photo[] = [
     id: 'ex3',
     author: 'Patrícia',
     caption: 'missão cumprida com o pessoal do Financeiro',
-    placeholder: party('#ff9ec4', '#38e1ff', '#6e2a3f'),
+    placeholder: party('#ffe9a8', '#d9a52b', '#5a3328'),
     takenAt: new Date('2026-11-07T20:58:00'),
     reactions: { ...zero(), '😍': 9, '🔥': 4 },
     mine: {},
     tilt: -1,
-    frame: 'chrome',
+    frame: 'gold',
   },
 ]
 

@@ -24,7 +24,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
   const [stage, setStage] = useState<Stage>('zoom')
   const [progress, setProgress] = useState(0)
   const [caption, setCaption] = useState('')
-  const [frame, setFrame] = useState<Frame>('dark')
+  const [frame, setFrame] = useState<Frame>('classic')
   const [canShake, setCanShake] = useState(motionAllowed)
   const holding = useRef(false)
   const raf = useRef(0)
@@ -139,7 +139,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
               ))}
             </div>
             <button className="btn ghost" onClick={onDiscard}>Descartar</button>
-            <button className="btn neon" onClick={() => onPost(caption.trim(), frame)}>Postar no feed</button>
+            <button className="btn primary" onClick={() => onPost(caption.trim(), frame)}>Postar no feed</button>
           </>
         ) : (
           <>
