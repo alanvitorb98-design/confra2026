@@ -1,7 +1,7 @@
 import { motion } from 'motion/react'
 import { SynthScene } from './SynthScene'
 
-/** Opening shot: the sun rises behind neon mountains while the road runs toward you. Tap the button to go in. */
+/** Opening shot: the sun rises behind neon mountains while the grid floor rushes toward you. Tap the button to go in. */
 export function Splash({ onDone }: { onDone: () => void }) {
   return (
     <motion.div className="splash" exit={{ opacity: 0 }}>

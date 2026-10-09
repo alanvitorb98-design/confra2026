@@ -5,7 +5,7 @@ const BACK = 'M0 100 L0 70 L22 52 L44 72 L70 40 L96 66 L120 30 L146 60 L168 44 L
 const FRONT = 'M0 100 L0 84 L30 66 L58 88 L88 62 L118 90 L150 70 L176 92 L206 58 L236 90 L262 74 L290 92 L322 64 L352 88 L380 72 L400 86 L400 100 Z'
 
 interface Props {
-  /** intro: sun rises, ridges draw in and a road runs; ambient: static backdrop behind the app */
+  /** intro: sun rises, ridges draw in and the floor rushes in; ambient: calm backdrop behind the app */
   variant: 'intro' | 'ambient'
 }
 
@@ -34,7 +34,7 @@ export function SynthScene({ variant }: Props) {
         <path d={FRONT} className="ridge ridge-front" />
       </svg>
       <div className="scene-ground">
-        <GridFloor speed={variant === 'intro' ? 2.4 : 0.5} road={variant === 'intro'} />
+        <GridFloor speed={variant === 'intro' ? 2.4 : 0.5} />
       </div>
       <div className="scene-horizon" />
     </div>

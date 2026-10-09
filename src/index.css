@@ -79,7 +79,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outl
 .scene-ambient { --hz: 64%; }
 .scene-ambient::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(9 6 32 / .55), rgb(9 6 32 / .25) 45%, rgb(9 6 32 / .45)); }
 
-/* intro: sun rises, ridges draw in, road runs toward you */
+/* intro: sun rises, ridges draw in, floor rushes toward you */
 .scene-intro .scene-sun { animation: sunrise 2.4s cubic-bezier(.16, .8, .2, 1) .15s both; }
 @keyframes sunrise { from { translate: -50% -5%; filter: drop-shadow(0 0 10px rgb(255 214 120 / .2)); } }
 .scene-intro .ridge { stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: draw 1.8s ease-out .4s forwards; }
