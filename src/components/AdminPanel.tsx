@@ -41,8 +41,8 @@ export function AdminPanel({ missions, onClose }: Props) {
   const [stats, setStats] = useState<{ guests: number; photos: number; bytes: number }>()
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
-  const [draft, setDraft] = useState<Record<string, { title: string; points: number; active: boolean }>>({})
-  const [adding, setAdding] = useState({ title: '', points: 30 })
+  const [draft, setDraft] = useState<Record<string, { title: string; points: number; active: boolean; target: string }>>({})
+  const [adding, setAdding] = useState({ title: '', points: 30, target: '' })
   const [faceStats, setFaceStats] = useState<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>()
   const [faceSecret, setFaceSecret] = useState<string>()
 
@@ -93,7 +93,7 @@ export function AdminPanel({ missions, onClose }: Props) {
     a.click()
   }
 
-  const row = (m: MissionRow) => draft[m.id] ?? { title: m.title, points: m.points, active: m.active }
+  const row = (m: MissionRow) => draft[m.id] ?? { title: m.title, points: m.points, active: m.active, target: m.target ?? '' }
 
   return (
     <div className="page admin">
@@ -184,6 +184,7 @@ export function AdminPanel({ missions, onClose }: Props) {
                 <input value={d.title} onChange={(e) => edit({ title: e.target.value })} aria-label="Missão" />
                 <input type="number" min={1} max={500} value={d.points} onChange={(e) => edit({ points: Number(e.target.value) })} aria-label="Pontos" />
                 <label className="admin-mini"><input type="checkbox" checked={d.active} onChange={(e) => edit({ active: e.target.checked })} /> ativa</label>
+                <input className="admin-target" value={d.target} onChange={(e) => edit({ target: e.target.value })} placeholder="Quem tem que aparecer (opcional)" aria-label="Quem tem que aparecer" />
                 {draft[m.id] && (
                   <button className="btn primary small" disabled={busy} onClick={() => run(async () => { await admin.saveMission({ id: m.id, ...d, sort: m.sort }); setDraft((x) => { const next = { ...x }; delete next[m.id]; return next }) }, 'Missão salva.')}>
                     Salvar
@@ -195,16 +196,17 @@ export function AdminPanel({ missions, onClose }: Props) {
           <li className="admin-new">
             <input value={adding.title} onChange={(e) => setAdding({ ...adding, title: e.target.value })} placeholder="Nova missão" aria-label="Nova missão" />
             <input type="number" min={1} max={500} value={adding.points} onChange={(e) => setAdding({ ...adding, points: Number(e.target.value) })} aria-label="Pontos" />
+            <input className="admin-target" value={adding.target} onChange={(e) => setAdding({ ...adding, target: e.target.value })} placeholder="Quem tem que aparecer (opcional)" aria-label="Quem tem que aparecer" />
             <button
               className="btn primary small"
               disabled={busy || adding.title.trim().length < 3}
-              onClick={() => run(async () => { await admin.saveMission({ ...adding, active: true, sort: missions.length + 1 }); setAdding({ title: '', points: 30 }) }, 'Missão criada.')}
+              onClick={() => run(async () => { await admin.saveMission({ ...adding, active: true, sort: missions.length + 1 }); setAdding({ title: '', points: 30, target: '' }) }, 'Missão criada.')}
             >
               Criar
             </button>
           </li>
         </ul>
-        <p className="page-note">Missão desativada some pra quem ainda não fez. Os pontos de quem já fez continuam.</p>
+        <p className="page-note">O número é quanto a missão vale. Se preencher quem tem que aparecer, a missão só conta quando o reconhecimento achar o rosto dessa pessoa na foto (o nome não precisa ser exato, e a pessoa precisa ter cadastrado a selfie). Missão desativada some pra quem ainda não fez. Os pontos de quem já fez continuam.</p>
       </section>
 
       <section className="panel admin-section">

@@ -141,8 +141,8 @@ export const admin = {
   saveEvent: (p: Partial<AdminEvent>) => call<void>('admin_update_event', { p }),
   code: async () => (await call<{ code: string }>('admin_secrets')).code,
   setCode: (code: string) => call<void>('admin_set_code', { p_code: code }),
-  saveMission: (m: { id?: string; title: string; points: number; active: boolean; sort: number }) =>
-    call<string>('admin_save_mission', { p_id: m.id ?? null, p_title: m.title, p_points: m.points, p_active: m.active, p_sort: m.sort }),
+  saveMission: (m: { id?: string; title: string; points: number; active: boolean; sort: number; target: string }) =>
+    call<string>('admin_mission', { p_id: m.id ?? null, p_title: m.title, p_points: m.points, p_active: m.active, p_sort: m.sort, p_target: m.target }),
   clearPhotos: () => call<number>('admin_clear_photos'),
   stats: () => call<{ guests: number; photos: number; bytes: number }>('admin_stats'),
   faceStats: () => call<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>('admin_face_stats'),
@@ -163,6 +163,8 @@ interface PhotoRow {
   created_at: string
   removed_at: string | null
   mission_id: string | null
+  /** null while the face check of a mission that names someone is pending */
+  mission_ok?: boolean | null
 }
 
 export interface MissionRow {
@@ -171,6 +173,8 @@ export interface MissionRow {
   points: number
   active: boolean
   sort: number
+  /** who has to appear in the photo (loose name match), or null */
+  target: string | null
 }
 
 interface ReactionRow {
@@ -251,7 +255,7 @@ export function useParty(me: Guest | null) {
     }
 
     const loadMissions = async () => {
-      const { data } = await db.from('missions').select('id,title,points,active,sort').order('sort')
+      const { data } = await db.from('missions').select('id,title,points,active,sort,target').order('sort')
       if (alive && data) setMissionRows(data as MissionRow[])
     }
 
@@ -387,23 +391,36 @@ export function useParty(me: Guest | null) {
     return [...count].map(([g, value]) => ({ name: guests.get(g) ?? 'Convidado', value })).sort((a, b) => b.value - a.value)
   }, [faces, rows, guests])
 
-  // a mission counts once per guest, from the first photo posted for it
+  // a mission counts once per guest, from a photo the server accepted for it (when it names someone,
+  // that person's face has to be found in the photo)
   const { missions, points } = useMemo(() => {
     const done = new Set<string>()
+    const checking = new Set<string>()
+    const missed = new Set<string>()
     const byGuest = new Map<string, Set<string>>()
     for (const row of rows.values()) {
       if (!row.mission_id) continue
-      const set = byGuest.get(row.guest_id) ?? new Set()
-      set.add(row.mission_id)
-      byGuest.set(row.guest_id, set)
-      if (row.guest_id === me?.id) done.add(row.mission_id)
+      const mine = row.guest_id === me?.id
+      if (row.mission_ok === true) {
+        const set = byGuest.get(row.guest_id) ?? new Set()
+        set.add(row.mission_id)
+        byGuest.set(row.guest_id, set)
+        if (mine) done.add(row.mission_id)
+      } else if (mine) (row.mission_ok === false ? missed : checking).add(row.mission_id)
     }
-    for (const l of local.values()) if (l.row.mission_id && l.status !== 'failed') done.add(l.row.mission_id)
+    for (const l of local.values()) if (l.row.mission_id && l.status !== 'failed' && !rows.has(l.row.id)) checking.add(l.row.mission_id)
     const value = new Map(missionRows.map((m) => [m.id, m.points]))
     // each guest gets the missions in their own random order, the same on every load (seeded by their id)
     const missions: Mission[] = missionRows
       .filter((m) => m.active || done.has(m.id))
-      .map((m) => ({ id: m.id, title: m.title, points: m.points, done: done.has(m.id) }))
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        points: m.points,
+        target: m.target ?? undefined,
+        done: done.has(m.id),
+        status: done.has(m.id) ? undefined : checking.has(m.id) ? ('checking' as const) : missed.has(m.id) ? ('missed' as const) : undefined,
+      }))
       .sort((a, b) => seeded(`${me?.id}:${a.id}`) - seeded(`${me?.id}:${b.id}`))
     const points = [...byGuest]
       .map(([g, set]) => ({ name: guests.get(g) ?? 'Convidado', value: [...set].reduce((a, id) => a + (value.get(id) ?? 0), 0) }))
