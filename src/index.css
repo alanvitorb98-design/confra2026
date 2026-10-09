@@ -40,38 +40,51 @@ body {
 button { font: inherit; color: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
-/* ---------- sky + grid floor ---------- */
-.horizon, .welcome::before {
-  position: fixed; inset: 0; z-index: -1; pointer-events: none;
-  background:
-    radial-gradient(120% 60% at 50% 0%, var(--violet) 0%, transparent 60%),
-    linear-gradient(180deg, var(--night) 0%, var(--night-2) 55%, #2a0f45 70%, var(--night) 100%);
+/* ---------- synth scene: starry sky, striped sun, glassy peaks, violet grid ---------- */
+.scene { --hz: 60%; position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: #090620; }
+.scene-sky { position: absolute; inset: 0 0 calc(100% - var(--hz)) 0; background: linear-gradient(180deg, #0a0824 0%, #1c0f45 30%, #4a1665 62%, #8a2380 86%, #b8338c 100%); }
+.scene-stars {
+  position: absolute; inset: 0 0 calc(100% - var(--hz) + 8%) 0;
+  background-image:
+    radial-gradient(1px 1px at 12px 18px, #fff 99%, transparent), radial-gradient(1px 1px at 77px 51px, #ffffffcc 99%, transparent),
+    radial-gradient(1.5px 1.5px at 41px 96px, #fff 99%, transparent), radial-gradient(1px 1px at 131px 12px, #ffffffaa 99%, transparent),
+    radial-gradient(1px 1px at 104px 133px, #fff 99%, transparent), radial-gradient(1.5px 1.5px at 160px 74px, #ffe6ff 99%, transparent);
+  background-size: 170px 150px;
+  -webkit-mask: linear-gradient(#000 40%, transparent); mask: linear-gradient(#000 40%, transparent);
+  animation: twinkle 4s ease-in-out infinite alternate;
 }
-.horizon::before, .welcome::after {
-  /* the sun, sliced by scanlines */
-  content: ''; position: fixed; left: 50%; top: 46vh; width: 72vmin; aspect-ratio: 1; translate: -50% -50%;
-  border-radius: 50%; z-index: -1; pointer-events: none;
-  background: linear-gradient(180deg, #ffe66d 0%, var(--sun) 35%, var(--pink) 70%, #9b2cff 100%);
-  -webkit-mask: linear-gradient(180deg, #000 0 52%, transparent 52% 55%, #000 55% 62%, transparent 62% 66%, #000 66% 73%, transparent 73% 78%, #000 78% 85%, transparent 85% 91%, #000 91%);
-  mask: linear-gradient(180deg, #000 0 52%, transparent 52% 55%, #000 55% 62%, transparent 62% 66%, #000 66% 73%, transparent 73% 78%, #000 78% 85%, transparent 85% 91%, #000 91%);
-  filter: drop-shadow(0 0 40px rgb(255 61 154 / .55)) drop-shadow(0 0 90px rgb(255 177 61 / .3));
-  opacity: .85;
+@keyframes twinkle { from { opacity: .45; } to { opacity: 1; } }
+.scene-sun {
+  position: absolute; left: 50%; top: var(--hz); width: min(66vmin, 440px); aspect-ratio: 1; border-radius: 50%;
+  background: linear-gradient(180deg, #fff7a8 0%, #ffe45c 30%, #ffc16b 46%, #ff7fae 64%, #f04aa8 82%, #c13aa6 100%);
+  -webkit-mask: linear-gradient(180deg, #000 0 50%, transparent 50% 52%, #000 52% 58%, transparent 58% 61%, #000 61% 66%, transparent 66% 70%, #000 70% 74%, transparent 74% 79%, #000 79% 82%, transparent 82% 88%, #000 88%);
+  mask: linear-gradient(180deg, #000 0 50%, transparent 50% 52%, #000 52% 58%, transparent 58% 61%, #000 61% 66%, transparent 66% 70%, #000 70% 74%, transparent 74% 79%, #000 79% 82%, transparent 82% 88%, #000 88%);
+  filter: drop-shadow(0 0 30px rgb(255 214 120 / .55)) drop-shadow(0 0 90px rgb(255 90 170 / .45));
+  translate: -50% -78%;
 }
-.horizon::after {
-  /* perspective grid floor */
-  content: ''; position: fixed; left: -50%; right: -50%; bottom: -10vh; height: 60vh;
-  background:
-    linear-gradient(180deg, var(--night) 0%, transparent 30%),
-    repeating-linear-gradient(90deg, rgb(56 225 255 / .55) 0 2px, transparent 2px 64px),
-    repeating-linear-gradient(0deg, rgb(255 61 154 / .5) 0 2px, transparent 2px 48px);
-  transform: perspective(300px) rotateX(62deg);
-  transform-origin: 50% 0;
-  animation: floor 2.4s linear infinite;
-  -webkit-mask: linear-gradient(180deg, transparent, #000 40%);
-  mask: linear-gradient(180deg, transparent, #000 40%);
-  opacity: .55;
+.scene-mountains { position: absolute; left: -2%; width: 104%; top: calc(var(--hz) - 13vh); height: 13vh; display: block; }
+.ridge { fill: none; stroke-width: 1.4; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.ridge-back { stroke: #9fb2ff; filter: drop-shadow(0 0 3px #7f8cff); }
+.ridge-front { stroke: #c9b6ff; filter: drop-shadow(0 0 4px #b07bff); }
+.scene-ground { position: absolute; left: 0; right: 0; top: var(--hz); bottom: 0; overflow: hidden; background: #12052a; }
+.grid-floor { display: block; width: 100%; height: 100%; }
+.scene-ground::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgb(160 70 255 / .45), transparent 22%); }
+.scene-horizon {
+  position: absolute; left: 0; right: 0; top: var(--hz); height: 3px; translate: 0 -1px;
+  background: linear-gradient(90deg, transparent, #f4e8ff 15%, #fff 50%, #f4e8ff 85%, transparent);
+  box-shadow: 0 0 10px #e0b8ff, 0 0 30px #b06cff, 0 0 70px rgb(176 108 255 / .7);
 }
-@keyframes floor { to { background-position: 0 0, 0 0, 0 48px; } }
+
+/* ambient: same picture, calmer, dimmed so cards stay readable */
+.scene-ambient { --hz: 64%; }
+.scene-ambient::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgb(9 6 32 / .55), rgb(9 6 32 / .25) 45%, rgb(9 6 32 / .45)); }
+
+/* intro: sun rises, ridges draw in, road runs toward you */
+.scene-intro .scene-sun { animation: sunrise 2.4s cubic-bezier(.16, .8, .2, 1) .15s both; }
+@keyframes sunrise { from { translate: -50% -5%; filter: drop-shadow(0 0 10px rgb(255 214 120 / .2)); } }
+.scene-intro .ridge { stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: draw 1.8s ease-out .4s forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.scene-intro .scene-horizon { animation: fade 1.2s ease .2s both; }
 
 /* film grain over everything, very subtle */
 .app::after, .welcome .logo-block::after {
@@ -300,52 +313,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .frame-swatch[aria-checked='true'] { color: #fff; border-color: var(--glass-line); background: rgb(255 255 255 / .08); }
 
 /* ---------- splash ---------- */
-.splash { --horizon: 58%; position: fixed; inset: 0; z-index: 100; overflow: hidden; background: var(--night); }
-.splash-sky { position: absolute; inset: 0; background: radial-gradient(90% 55% at 50% var(--horizon), #6a1f86 0%, #2a0f52 40%, var(--night) 78%); animation: fade 1.2s ease both; }
-.splash-stars {
-  position: absolute; inset: 0 0 calc(100% - var(--horizon)) 0; opacity: .8;
-  background:
-    radial-gradient(1px 1px at 12% 18%, #fff, transparent), radial-gradient(1px 1px at 28% 8%, #fff, transparent),
-    radial-gradient(1.5px 1.5px at 46% 22%, #fff, transparent), radial-gradient(1px 1px at 63% 12%, #fff, transparent),
-    radial-gradient(1.5px 1.5px at 78% 26%, #fff, transparent), radial-gradient(1px 1px at 90% 9%, #fff, transparent),
-    radial-gradient(1px 1px at 8% 38%, #fff, transparent), radial-gradient(1px 1px at 86% 40%, #fff, transparent);
-  animation: twinkle 3s ease-in-out infinite alternate;
-}
-@keyframes twinkle { from { opacity: .35; } }
-.splash-sun {
-  position: absolute; left: 50%; top: var(--horizon); width: min(78vmin, 460px); aspect-ratio: 1; border-radius: 50%;
-  background: linear-gradient(180deg, #ffe66d 0%, var(--sun) 35%, var(--pink) 68%, #9b2cff 100%);
-  -webkit-mask: linear-gradient(180deg, #000 0 48%, transparent 48% 51%, #000 51% 58%, transparent 58% 62%, #000 62% 69%, transparent 69% 74%, #000 74% 81%, transparent 81% 87%, #000 87%);
-  mask: linear-gradient(180deg, #000 0 48%, transparent 48% 51%, #000 51% 58%, transparent 58% 62%, #000 62% 69%, transparent 69% 74%, #000 74% 81%, transparent 81% 87%, #000 87%);
-  filter: drop-shadow(0 0 50px rgb(255 61 154 / .75)) drop-shadow(0 0 120px rgb(255 177 61 / .45));
-  translate: -50% -62%;
-  animation: sunrise 2.2s cubic-bezier(.16, .8, .2, 1) .2s both;
-}
-@keyframes sunrise { from { translate: -50% 0%; filter: drop-shadow(0 0 20px rgb(255 61 154 / .3)); } }
-.splash-mountains { position: absolute; left: 0; width: 100%; top: calc(var(--horizon) - 15vh); height: 15vh; display: block; }
-.splash-mountains .ridge { filter: drop-shadow(0 0 4px currentColor); stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: draw 1.6s ease-out .3s forwards; }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-.splash-ground { position: absolute; left: 0; right: 0; top: var(--horizon); bottom: 0; perspective: 240px; perspective-origin: 50% 0; overflow: hidden; }
-.splash-floor { position: absolute; left: -60%; right: -60%; top: 0; height: 300%; transform: rotateX(72deg); transform-origin: 50% 0; }
-.splash-floor {
-  background:
-    repeating-linear-gradient(90deg, rgb(56 225 255 / .55) 0 2px, transparent 2px 70px),
-    repeating-linear-gradient(0deg, rgb(255 61 154 / .55) 0 2px, transparent 2px 60px),
-    linear-gradient(180deg, #1a0a33, var(--night));
-  box-shadow: 0 -2px 30px rgb(255 61 154 / .9);
-  animation: road 0.6s linear infinite;
-}
-.splash-road { position: absolute; top: 0; bottom: 0; left: calc(50% - 110px); width: 220px; background: linear-gradient(90deg, #07030f, #140a24 50%, #07030f); }
-.road-edge { position: absolute; top: 0; bottom: 0; width: 4px; background: var(--pink); box-shadow: 0 0 12px var(--pink), 0 0 30px var(--pink); }
-.road-edge.left { left: 0; } .road-edge.right { right: 0; }
-.road-lane {
-  position: absolute; top: 0; bottom: 0; left: 50%; width: 6px; margin-left: -3px;
-  background: repeating-linear-gradient(180deg, #ffe66d 0 40px, transparent 40px 90px);
-  box-shadow: 0 0 10px rgb(255 230 109 / .6);
-  animation: lane 0.6s linear infinite;
-}
-@keyframes road { to { background-position: 0 60px, 0 60px, 0 0; } }
-@keyframes lane { to { background-position: 0 90px; } }
+.splash { position: fixed; inset: 0; z-index: 100; overflow: hidden; background: #090620; }
+.splash .scene { z-index: 0; }
 .splash-title { position: absolute; left: 16px; right: 16px; top: 12%; display: grid; justify-items: center; gap: 14px; text-align: center; z-index: 2; }
 .splash-question { margin: 0; font-family: var(--display); font-size: clamp(17px, 5vw, 24px); line-height: 1.25; color: #fff; text-wrap: balance; text-shadow: 0 0 14px rgb(56 225 255 / .8), 0 2px 0 rgb(0 0 0 / .5); }
 .splash-go { position: fixed; left: 50%; bottom: calc(40px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; min-width: 200px; height: 58px; font-size: 18px; }
@@ -432,7 +401,6 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
   padding: calc(28px + env(safe-area-inset-top, 0px)) 18px calc(28px + env(safe-area-inset-bottom, 0px));
   max-width: 460px; margin: 0 auto;
 }
-.welcome::after { top: 13vh; width: 40vmin; opacity: .65; }
 .logo-block { text-align: center; }
 .logo-sub { margin: 10px 0 0; font-size: 13px; letter-spacing: .3em; text-transform: uppercase; color: var(--cyan); text-shadow: 0 0 12px rgb(56 225 255 / .8); }
 .welcome-form { display: grid; gap: 14px; }

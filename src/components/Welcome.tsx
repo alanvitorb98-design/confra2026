@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Guest } from '../lib/types'
+import { SynthScene } from './SynthScene'
 
 export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
   const [name, setName] = useState('')
@@ -17,6 +18,7 @@ export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
 
   return (
     <div className="welcome">
+      <SynthScene variant="ambient" />
       <div className="logo-block">
         <h1 className="logo">CONFRA<span>26</span></h1>
         <p className="logo-sub">fim de ano · 07.11.2026</p>

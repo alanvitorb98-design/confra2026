@@ -11,6 +11,7 @@ import { exampleAppearances, exampleMissions, examplePhotos, examplePoints } fro
 import { playShutter } from './lib/sound'
 import type { Frame, Guest, Photo, Reaction } from './lib/types'
 import { Splash } from './components/Splash'
+import { SynthScene } from './components/SynthScene'
 
 type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
@@ -88,7 +89,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="horizon" aria-hidden />
+      <SynthScene variant="ambient" />
 
       <header className="topbar">
         <h1 className="logo small">CONFRA<span>26</span></h1>
