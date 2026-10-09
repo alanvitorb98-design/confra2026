@@ -3,11 +3,15 @@ import type { Guest } from '../lib/types'
 import { Logo } from './Logo'
 import { PartyScene } from './PartyScene'
 
-export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
+type NewGuest = Omit<Guest, 'id' | 'token'>
+
+export function Welcome({ onEnter }: { onEnter: (g: NewGuest) => Promise<void> }) {
   const [name, setName] = useState('')
   const [instagram, setInstagram] = useState('')
   const [faceOptIn, setFaceOptIn] = useState(true)
   const [selfieUrl, setSelfieUrl] = useState<string>()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string>()
 
   const pickSelfie = (f?: File) => {
     if (!f) return
@@ -27,10 +31,17 @@ export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
 
       <form
         className="welcome-form"
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault()
-          if (!ready) return
-          onEnter({ name: name.trim(), instagram: instagram.replace(/^@/, '').trim() || undefined, faceOptIn, selfieUrl: faceOptIn ? selfieUrl : undefined })
+          if (!ready || busy) return
+          setBusy(true)
+          setError(undefined)
+          try {
+            await onEnter({ name: name.trim(), instagram: instagram.replace(/^@/, '').trim() || undefined, faceOptIn, selfieUrl: faceOptIn ? selfieUrl : undefined })
+          } catch {
+            setError('Não deu pra entrar agora. Confere a internet e tenta de novo.')
+            setBusy(false)
+          }
         }}
       >
         <label className="field">
@@ -58,7 +69,8 @@ export function Welcome({ onEnter }: { onEnter: (g: Guest) => void }) {
           )}
         </div>
 
-        <button className="btn primary wide" disabled={!ready}>Entrar na festa</button>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <button className="btn primary wide" disabled={!ready || busy}>{busy ? 'Entrando…' : 'Entrar na festa'}</button>
       </form>
     </div>
   )

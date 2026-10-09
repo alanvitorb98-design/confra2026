@@ -7,9 +7,10 @@ import { Profile } from './components/Profile'
 import { Ranking } from './components/Ranking'
 import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
-import { exampleAppearances, exampleLooks, exampleMissions, examplePhotos, examplePoints } from './lib/mock'
+import { exampleAppearances, exampleMissions, examplePoints } from './lib/mock'
+import { join, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
-import type { Frame, Guest, Photo, Reaction, Wall } from './lib/types'
+import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
 import { PhaseBar } from './components/PhaseBar'
 import { LOOK_CLOSES, clock, lookOpen, phaseAt, testClock, useNow } from './lib/event'
@@ -26,7 +27,9 @@ const GUEST_KEY = 'confra26.guest'
 function loadGuest(): Guest | null {
   try {
     const raw = localStorage.getItem(GUEST_KEY)
-    return raw ? (JSON.parse(raw) as Guest) : null
+    const g = raw ? (JSON.parse(raw) as Guest) : null
+    // profiles saved before the server existed have no id: sign in again
+    return g?.id && g.token ? g : null
   } catch {
     return null
   }
@@ -35,7 +38,6 @@ function loadGuest(): Guest | null {
 export default function App() {
   const [guest, setGuest] = useState<Guest | null>(loadGuest)
   const [tab, setTab] = useState<Tab>('feed')
-  const [photos, setPhotos] = useState<Photo[]>(() => [...exampleLooks, ...examplePhotos])
   const [wall, setWall] = useState<Wall>('party')
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
@@ -44,6 +46,8 @@ export default function App() {
   const [gate, setGate] = useState(() => !isInstalled())
   const t = useNow()
   const phase = phaseAt(t)
+  const party = useParty(guest && phase !== 'countdown' ? guest : null)
+  const photos = party.photos
 
   useEffect(() => {
     if (!guest) return
@@ -63,7 +67,7 @@ export default function App() {
       </AnimatePresence>
     )
   if (phase === 'countdown') return <Countdown />
-  if (!guest) return <Welcome onEnter={setGuest} />
+  if (!guest) return <Welcome onEnter={async (g) => setGuest(await join(g))} />
 
   // before the party only the outfit wall exists; afterwards both, party first
   const showWall: Wall = phase === 'warmup' || phase === 'look' ? 'look' : wall
@@ -74,50 +78,29 @@ export default function App() {
 
   const shoot = () => canShoot && camera.current?.click()
 
-  const react = (id: string, r: Reaction, force = false) =>
-    setPhotos((list) =>
-      list.map((p) => {
-        if (p.id !== id || (force && p.mine[r])) return p
-        const on = !p.mine[r]
-        return { ...p, mine: { ...p.mine, [r]: on }, reactions: { ...p.reactions, [r]: p.reactions[r] + (on ? 1 : -1) } }
-      }),
-    )
-
   const post = (caption: string, frame: Frame, preview: string) => {
     if (!shot) return
-    const photo: Photo = {
-      id: crypto.randomUUID(),
-      author: guest.name,
-      caption,
-      kind: shootKind,
-      // the untouched original File: no resizing or recompression anywhere
-      url: URL.createObjectURL(shot),
-      preview,
-      file: shot,
-      takenAt: new Date(),
-      reactions: { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
-      mine: {},
-      tilt: Math.round((Math.random() * 4 - 2) * 10) / 10,
-      frame,
-    }
-    // one outfit per guest: a new look replaces the previous one
-    setPhotos((list) => [photo, ...list.filter((p) => !(shootKind === 'look' && p.kind === 'look' && p.author === guest.name))])
+    // the untouched original File goes up as is: no resizing or recompression anywhere
+    party.post(shot, preview, shootKind, caption, frame)
     setWall(shootKind)
     setShot(null)
     setTab('feed')
     window.scrollTo({ top: 0 })
   }
 
-  const myPhotos = photos.filter((p) => p.author === guest.name).length
-  // example photos carry party-day timestamps: only show what already happened on the clock
-  const wallPhotos = photos.filter((p) => p.kind === showWall && p.takenAt.getTime() <= t)
+  const myPhotos = photos.filter((p) => p.authorId === guest.id).length
+  const wallPhotos = photos.filter((p) => p.kind === showWall)
   const total = (p: Photo) => Object.values(p.reactions).reduce((a, b) => a + b, 0)
   const bestLooks = photos
     .filter((p) => p.kind === 'look')
     .map((p) => ({ name: p.author, value: total(p) }))
     .sort((a, b) => b.value - a.value)
   const empty =
-    phase === 'warmup'
+    party.state === 'loading'
+      ? 'Carregando as fotos…'
+      : party.state === 'offline'
+        ? 'Sem conexão agora. As fotos aparecem assim que a internet voltar.'
+        : phase === 'warmup'
       ? 'O Look da Confra abre no dia da festa, às 7h. Já vai separando a roupa!'
       : phase === 'look'
         ? 'Ninguém postou o look ainda. Toca no botão e seja a primeira pessoa!'
@@ -142,7 +125,8 @@ export default function App() {
           <Feed
             key={showWall}
             photos={wallPhotos}
-            onReact={react}
+            onReact={party.react}
+            onRetry={party.retry}
             onOpen={setOpen}
             empty={empty}
             header={

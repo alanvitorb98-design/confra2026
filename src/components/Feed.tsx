@@ -13,6 +13,8 @@ interface Props {
   empty: string
   /** shown left of the stack/grid switch, e.g. the party/outfit wall switch */
   header?: ReactNode
+  /** send again a photo whose upload failed */
+  onRetry?: (id: string) => void
 }
 
 const time = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -78,7 +80,7 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
       >
         <PolaroidFrame frame={photo.frame}>
           <div className="polaroid-photo">
-            {photo.url ? <img src={photo.preview ?? photo.url} alt={photo.caption || `Foto de ${photo.author}`} draggable={false} /> : <span className="ph" style={{ background: photo.placeholder }} />}
+            {photo.url ? <img src={photo.preview ?? photo.url} alt={photo.caption || `Foto de ${photo.author}`} draggable={false} crossOrigin="anonymous" /> : <span className="ph" style={{ background: photo.placeholder }} />}
             <span className="stamp">'26 11 07 · {time(photo.takenAt)}</span>
             {isTop && burst > 0 && (
               <motion.span
@@ -101,17 +103,22 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
 }
 
 /** Stack of Polaroids: fling the top one aside to see the next, double tap to react with 🔥. */
-export function Feed({ photos, onReact, onOpen, empty, header }: Props) {
-  const [index, setIndex] = useState(0)
+export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props) {
+  // follow the card on top by id, so photos arriving live from others don't move it
+  const [topId, setTopId] = useState<string>()
   const [burst, setBurst] = useState(0)
   const [view, setView] = useState<'stack' | 'grid'>('stack')
   const lastTap = useRef(0)
   const tapTimer = useRef<number>()
   const count = photos.length
 
-  // a new post lands on top of the stack
-  const newest = photos[0]?.id
-  useEffect(() => setIndex(0), [newest])
+  // my own new post lands on top of the stack
+  const newest = photos[0]
+  const mineNew = newest?.status === 'sending' ? newest.id : undefined
+  useEffect(() => {
+    if (mineNew) setTopId(mineNew)
+  }, [mineNew])
+  const index = Math.max(0, photos.findIndex((p) => p.id === topId))
   useEffect(() => () => clearTimeout(tapTimer.current), [])
 
   if (count === 0)
@@ -166,7 +173,7 @@ export function Feed({ photos, onReact, onOpen, empty, header }: Props) {
             >
               <PolaroidFrame frame={p.frame}>
                 <span className="polaroid-photo">
-                  {p.url ? <img src={p.preview ?? p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" /> : <span className="ph" style={{ background: p.placeholder }} />}
+                  {p.url ? <img src={p.preview ?? p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" crossOrigin="anonymous" /> : <span className="ph" style={{ background: p.placeholder }} />}
                   <span className="stamp">{time(p.takenAt)}</span>
                 </span>
                 <figcaption>{p.caption || '\u00a0'}</figcaption>
@@ -184,12 +191,18 @@ export function Feed({ photos, onReact, onOpen, empty, header }: Props) {
         {photos.map((p, i) => {
           const depth = (i - (index % count) + count) % count
           if (depth >= shown) return null
-          return <Card key={p.id} photo={p} depth={depth} burst={depth === 0 ? burst : 0} onTap={tap} onFling={() => setIndex((n) => (n + 1) % count)} />
+          return <Card key={p.id} photo={p} depth={depth} burst={depth === 0 ? burst : 0} onTap={tap} onFling={() => setTopId(photos[(index + 1) % count].id)} />
         })}
       </div>
 
       <div className="feed-meta">
-        <span className="feed-author">{handle(top.author)}</span>
+        {top.status === 'failed' ? (
+          <button className="feed-status failed" onClick={() => onRetry?.(top.id)}>Não foi. Tocar pra reenviar</button>
+        ) : top.status === 'sending' ? (
+          <span className="feed-status">Enviando…</span>
+        ) : (
+          <span className="feed-author">{handle(top.author)}</span>
+        )}
         <span className="feed-pos">
           {(index % count) + 1} / {count}
         </span>

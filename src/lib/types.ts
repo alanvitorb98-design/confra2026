@@ -11,6 +11,10 @@ export const FRAMES: { id: Frame; label: string }[] = [
 ]
 
 export interface Guest {
+  /** Assigned by the server when the guest joins */
+  id: string
+  /** Secret kept on this phone; the server only stores its hash */
+  token: string
   name: string
   instagram?: string
   /** Object URL of the selfie, when the guest opted in to face matching */
@@ -25,6 +29,7 @@ export interface Photo {
   id: string
   kind: Wall
   author: string
+  authorId?: string
   caption: string
   /** Full-quality original, shown in the viewer and used for the final album */
   url?: string
@@ -32,6 +37,10 @@ export interface Photo {
   preview?: string
   /** The untouched camera file, for downloads */
   file?: File
+  /** Size of the original, for the download button */
+  bytes?: number
+  /** Only on photos sent from this phone that have not reached the server yet */
+  status?: 'sending' | 'failed'
   /** CSS background used by the example photos until the backend exists */
   placeholder?: string
   takenAt: Date

@@ -6,6 +6,8 @@ const H = 1920
 function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const img = new Image()
+    // photos come from the storage host: ask for CORS so the canvas can be exported
+    img.crossOrigin = 'anonymous'
     img.onload = () => resolve(img)
     img.onerror = reject
     img.src = src
