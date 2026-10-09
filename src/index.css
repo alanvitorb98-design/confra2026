@@ -515,3 +515,37 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .install-code { margin: 0; padding: 12px 14px; border: 1px dashed #d9a52b66; border-radius: 14px; color: #e9e2cc; font-size: 15px; display: grid; gap: 4px; }
 .install-code b { color: #f3cf6e; letter-spacing: .06em; user-select: all; }
 .install-code span { color: #b0a993; font-size: 13px; }
+
+/* party place map */
+.place-map { width: 100%; aspect-ratio: 16 / 10; border-radius: 14px; overflow: hidden; border: 1px solid #d9a52b55; box-shadow: 0 6px 18px #6b4a2422; }
+.place-map iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+/* organizer panel */
+.admin-head { display: flex; align-items: center; justify-content: space-between; }
+.admin-msg { margin: 0; padding: 10px 14px; border-radius: 12px; background: #fff7dc; border: 1px solid var(--line); color: var(--ink-2); font-size: 14px; }
+.admin-section { display: grid; gap: 12px; padding: 16px; }
+.admin-section h3 { margin: 6px 0 0; font-family: var(--display); font-weight: 400; font-size: 22px; }
+.admin-section h3 small { font-family: var(--body, inherit); font-size: 13px; color: var(--muted); }
+.admin-section input:not([type='checkbox']) { width: 100%; min-width: 0; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fffdf7; font: inherit; color: var(--ink); }
+.admin-qr { width: min(240px, 70vw); justify-self: center; border-radius: 14px; border: 1px solid var(--line); }
+.admin-code { justify-self: center; font-size: 20px; letter-spacing: .08em; color: var(--gold-deep); user-select: all; }
+.admin-row { display: flex; gap: 8px; justify-content: center; }
+.admin-row.wrap { flex-wrap: wrap; justify-content: flex-start; }
+.admin-toggle { display: flex; gap: 12px; align-items: flex-start; padding: 10px 0; }
+.admin-toggle input { width: 22px; height: 22px; accent-color: var(--gold-deep); margin-top: 2px; }
+.admin-toggle span { display: grid; gap: 2px; }
+.admin-toggle small { color: var(--muted); font-size: 13px; }
+.admin-missions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.admin-missions li { display: grid; grid-template-columns: 1fr 64px auto; gap: 8px; align-items: center; }
+.admin-missions li > button { grid-column: 1 / -1; justify-self: end; }
+.admin-new { padding-top: 10px; border-top: 1px dashed var(--line); }
+.admin-new > button { grid-column: auto !important; }
+.admin-mini { display: flex; gap: 4px; align-items: center; font-size: 13px; color: var(--muted); }
+.admin-mini input { accent-color: var(--gold-deep); }
+.btn.danger { color: #b3261e; border-color: #b3261e55; }
+.stats dd small { font-family: var(--body, inherit); font-size: 11px; color: var(--muted); }
+.organizer { display: grid; gap: 10px; }
+.organizer input { width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: #fffdf7; font: inherit; }
+.organizer-link { color: var(--muted); justify-self: center; }
+.cd-place .place-map { aspect-ratio: 2 / 1; }
+@media (max-height: 720px) { .cd-place .place-map { aspect-ratio: 5 / 2; } }

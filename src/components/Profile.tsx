@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Guest } from '../lib/types'
 import CountUp from './bits/CountUp'
 
@@ -6,12 +7,41 @@ interface Props {
   myPhotos: number
   points: number
   onLeave: () => void
+  isAdmin: boolean
+  onPanel: () => void
+  /** organizer code: true when accepted */
+  onClaim: (code: string) => Promise<boolean>
 }
 
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
 const standalone = window.matchMedia('(display-mode: standalone)').matches
 
-export function Profile({ guest, myPhotos, points, onLeave }: Props) {
+function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPanel' | 'onClaim'>) {
+  const [asking, setAsking] = useState(false)
+  const [code, setCode] = useState('')
+  const [state, setState] = useState<'idle' | 'busy' | 'wrong'>('idle')
+  if (isAdmin) return <button className="btn primary wide" onClick={onPanel}>Painel do organizador</button>
+  if (!asking) return <button className="install-skip organizer-link" onClick={() => setAsking(true)}>Sou da organização</button>
+  return (
+    <form
+      className="organizer"
+      onSubmit={async (e) => {
+        e.preventDefault()
+        setState('busy')
+        setState((await onClaim(code)) ? 'idle' : 'wrong')
+      }}
+    >
+      <label className="field">
+        <span>Código de organizador</span>
+        <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ADM-XXXXXXXX" autoCapitalize="characters" autoComplete="off" />
+      </label>
+      {state === 'wrong' && <p className="form-error">Código não confere.</p>}
+      <button className="btn ghost wide" disabled={state === 'busy' || code.length < 6}>{state === 'busy' ? 'Conferindo…' : 'Liberar painel'}</button>
+    </form>
+  )
+}
+
+export function Profile({ guest, myPhotos, points, onLeave, isAdmin, onPanel, onClaim }: Props) {
   return (
     <div className="page">
       <div className="profile">
@@ -34,6 +64,7 @@ export function Profile({ guest, myPhotos, points, onLeave }: Props) {
           <p>{isIOS ? 'No Safari, toque em Compartilhar e depois em "Adicionar à Tela de Início".' : 'No menu do Chrome, toque em "Instalar app" ou "Adicionar à tela inicial".'}</p>
         </div>
       )}
+      <Organizer isAdmin={isAdmin} onPanel={onPanel} onClaim={onClaim} />
       <button className="btn ghost wide" onClick={onLeave}>Sair</button>
     </div>
   )

@@ -37,6 +37,8 @@ export interface Photo {
   file?: File
   /** Size of the original, for the download button */
   bytes?: number
+  /** Set when the photo was taken for a mission */
+  missionId?: string
   /** Only on photos sent from this phone that have not reached the server yet */
   status?: 'sending' | 'failed'
   /** CSS background used by the example photos until the backend exists */

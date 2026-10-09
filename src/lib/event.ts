@@ -1,20 +1,72 @@
 import { useEffect, useState } from 'react'
 
-// Everything about the party date lives here. Times are Brasília (-03:00).
+// Everything about the party date. The organizer edits it in the admin panel; these are the
+// defaults until the server answers (and the last answer is cached on the phone). Times are Brasília (-03:00).
 export const EVENT = {
   start: new Date('2026-11-07T10:00:00-03:00'),
   end: new Date('2026-11-07T20:00:00-03:00'),
-  place: 'Local da confra',
+  /** null until the invitation code or a login unlocks it */
+  place: null as string | null,
   address: '',
-  mapsUrl: 'https://maps.app.goo.gl/hyafsQ7ASH6v94wcA',
+  mapsUrl: '',
+  lat: null as number | null,
+  lng: null as number | null,
+  testMode: false,
 }
 
-const HOUR = 3600_000
 /** The app opens one day before the party */
-export const APP_OPENS = new Date(EVENT.start.getTime() - 24 * HOUR)
+export let APP_OPENS = new Date('2026-11-06T20:00:00-03:00')
 /** The outfit wall: 7h to 12h on the party day, overlapping the first two hours of the party */
-export const LOOK_OPENS = new Date('2026-11-07T07:00:00-03:00')
-export const LOOK_CLOSES = new Date('2026-11-07T12:00:00-03:00')
+export let LOOK_OPENS = new Date('2026-11-07T07:00:00-03:00')
+export let LOOK_CLOSES = new Date('2026-11-07T12:00:00-03:00')
+
+/** What the server sends (see the event_public function) */
+export interface EventConfig {
+  app_opens: string
+  party_starts: string
+  party_ends: string
+  look_opens: string
+  look_closes: string
+  test_mode: boolean
+  place: string | null
+  address: string | null
+  maps_url: string | null
+  lat?: number | null
+  lng?: number | null
+}
+
+const CONFIG_KEY = 'confra26.event'
+
+export function applyConfig(c: EventConfig, cache = true) {
+  const date = (v: string, fallback: Date) => (Number.isNaN(Date.parse(v)) ? fallback : new Date(v))
+  EVENT.start = date(c.party_starts, EVENT.start)
+  EVENT.end = date(c.party_ends, EVENT.end)
+  APP_OPENS = date(c.app_opens, APP_OPENS)
+  LOOK_OPENS = date(c.look_opens, LOOK_OPENS)
+  LOOK_CLOSES = date(c.look_closes, LOOK_CLOSES)
+  EVENT.testMode = !!c.test_mode
+  // the place only comes with the code: never forget it because a later answer came without
+  if (c.place) {
+    EVENT.place = c.place
+    EVENT.address = c.address ?? ''
+    EVENT.mapsUrl = c.maps_url ?? ''
+    EVENT.lat = c.lat ?? null
+    EVENT.lng = c.lng ?? null
+  }
+  if (!cache) return
+  try {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify({ ...c, place: EVENT.place, address: EVENT.address, maps_url: EVENT.mapsUrl, lat: EVENT.lat, lng: EVENT.lng }))
+  } catch {
+    /* private mode */
+  }
+}
+
+try {
+  const raw = localStorage.getItem(CONFIG_KEY)
+  if (raw) applyConfig(JSON.parse(raw) as EventConfig, false)
+} catch {
+  /* no cache yet */
+}
 
 export const lookOpen = (now: number) => now >= LOOK_OPENS.getTime() && now < LOOK_CLOSES.getTime()
 
@@ -72,16 +124,26 @@ export function until(ms: number) {
 export const clock = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 export const day = (d: Date) => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })
 
-/** Calendar file for "Salvar na agenda" */
-export function calendarFile() {
+/**
+ * "Salvar na agenda" opens the phone's own calendar instead of downloading a file:
+ * Google Calendar's add-event screen on Android, and on iPhone a calendar link that iOS turns into
+ * its "Add to Calendar" sheet.
+ */
+export function openCalendar(code: string) {
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
-  const where = EVENT.address || EVENT.mapsUrl
-  const ics = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Confra da Firma//PT-BR', 'BEGIN:VEVENT',
-    `UID:confra-da-firma-${fmt(EVENT.start)}@confra`, `DTSTAMP:${fmt(new Date())}`,
-    `DTSTART:${fmt(EVENT.start)}`, `DTEND:${fmt(EVENT.end)}`,
-    'SUMMARY:Confra da Firma', `LOCATION:${where}`, `DESCRIPTION:Equipe Derhu · ${EVENT.mapsUrl}`,
-    'END:VEVENT', 'END:VCALENDAR',
-  ].join('\r\n')
-  return new File([ics], 'confra-da-firma.ics', { type: 'text/calendar' })
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  if (ios) {
+    location.href = `https://optapzbhyhklcirdoyid.supabase.co/functions/v1/agenda?c=${encodeURIComponent(code)}`
+    return
+  }
+  const where = [EVENT.place, EVENT.address].filter(Boolean).join(' · ')
+  const q = new URLSearchParams({
+    action: 'TEMPLATE',
+    text: 'Confra da Firma',
+    dates: `${fmt(EVENT.start)}/${fmt(EVENT.end)}`,
+    details: `Equipe Derhu${EVENT.mapsUrl ? ` · ${EVENT.mapsUrl}` : ''}`,
+    location: where,
+    ctz: 'America/Sao_Paulo',
+  })
+  window.open(`https://calendar.google.com/calendar/render?${q}`, '_blank', 'noopener')
 }

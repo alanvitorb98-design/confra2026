@@ -1,6 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
-import { APP_OPENS, EVENT, calendarFile, clock, day, split, useNow } from '../lib/event'
+import { APP_OPENS, EVENT, clock, day, openCalendar, split, useNow } from '../lib/event'
+import { eventCode } from '../lib/backend'
+import { PlaceMap } from './PlaceMap'
 import { Logo } from './Logo'
 import { PartyScene } from './PartyScene'
 
@@ -24,17 +26,6 @@ function Unit({ value, label }: { value: number; label: string }) {
       <span className="cd-label">{label}</span>
     </div>
   )
-}
-
-function saveCalendar() {
-  const url = URL.createObjectURL(calendarFile())
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'confra-da-firma.ics'
-  document.body.append(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
 
 /** Before the app opens: countdown to the party, with the place behind a button. */
@@ -62,6 +53,9 @@ export function Countdown() {
         <p className="cd-when">{day(EVENT.start)} às {clock(EVENT.start)}</p>
       </div>
 
+      {!EVENT.place ? (
+        <p className="cd-note">O local aparece quando você abre pelo QR do convite.</p>
+      ) : (
       <AnimatePresence mode="wait" initial={false}>
         {place ? (
           <motion.div
@@ -74,9 +68,10 @@ export function Countdown() {
           >
             <b>{EVENT.place}</b>
             {EVENT.address && <p>{EVENT.address}</p>}
+            <PlaceMap />
             <div className="cd-actions">
-              <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>
-              <button className="btn ghost small" onClick={saveCalendar}>Salvar na agenda</button>
+              {EVENT.mapsUrl && <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>}
+              <button className="btn ghost small" onClick={() => openCalendar(eventCode())}>Salvar na agenda</button>
             </div>
           </motion.div>
         ) : (
@@ -85,6 +80,7 @@ export function Countdown() {
           </motion.button>
         )}
       </AnimatePresence>
+      )}
 
       <p className="cd-note">O app abre no dia {day(APP_OPENS)} às {clock(APP_OPENS)} pra você fazer seu cadastro.</p>
     </div>

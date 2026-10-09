@@ -32,7 +32,11 @@ export function Ranking({ points, appearances, looks }: Props) {
           </li>
         ))}
       </ol>
-      {tab !== 'looks' && <p className="page-note">Exemplo: o ranking de missões e de quem mais aparece começa junto com a festa.</p>}
+      {list.length === 0 && (
+        <p className="page-note">
+          {tab === 'pts' ? 'Ninguém pontuou ainda. As missões começam junto com a festa.' : tab === 'faces' ? 'Esse ranking chega com o reconhecimento de rosto.' : 'Nenhum look ainda.'}
+        </p>
+      )}
     </div>
   )
 }

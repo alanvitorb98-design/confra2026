@@ -18,3 +18,31 @@ export async function makePreview(file: File, width = 1080): Promise<string> {
   }
   return URL.createObjectURL(file)
 }
+
+/** Most phone browsers can't draw a canvas bigger than this (iOS Safari limit) */
+const MAX_PIXELS = 16_000_000
+
+/**
+ * The copy kept on the server: full resolution, JPEG at 92%. On a phone screen it looks the same as
+ * the camera file and takes about half the space. Small or already light files go up untouched.
+ */
+export async function storageCopy(file: File): Promise<File> {
+  if (file.size < 1_500_000) return file
+  try {
+    const probe = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const scale = Math.min(1, Math.sqrt(MAX_PIXELS / (probe.width * probe.height)))
+    const w = Math.round(probe.width * scale)
+    const h = Math.round(probe.height * scale)
+    const canvas = document.createElement('canvas')
+    canvas.width = w
+    canvas.height = h
+    canvas.getContext('2d')!.drawImage(probe, 0, 0, w, h)
+    probe.close()
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
+    canvas.width = canvas.height = 0
+    if (blob && blob.size < file.size * 0.9) return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+  } catch {
+    // decoding failed (old browser, odd format): keep the camera file
+  }
+  return file
+}
