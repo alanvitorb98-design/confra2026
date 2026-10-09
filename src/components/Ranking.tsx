@@ -5,19 +5,22 @@ import CountUp from './bits/CountUp'
 interface Props {
   points: RankEntry[]
   appearances: RankEntry[]
+  /** best outfit by reactions, once the outfit wall has entries */
+  looks: RankEntry[]
 }
 
-export function Ranking({ points, appearances }: Props) {
-  const [tab, setTab] = useState<'pts' | 'faces'>('pts')
-  const list = tab === 'pts' ? points : appearances
-  const unit = tab === 'pts' ? 'pts' : 'fotos'
+export function Ranking({ points, appearances, looks }: Props) {
+  const [tab, setTab] = useState<'pts' | 'faces' | 'looks'>('pts')
+  const list = tab === 'pts' ? points : tab === 'faces' ? appearances : looks
+  const unit = tab === 'pts' ? 'pts' : tab === 'faces' ? 'fotos' : 'reações'
   const top = list[0]?.value || 1
   return (
     <div className="page">
       <h2 className="page-title">Ranking</h2>
-      <div className="segmented" role="tablist">
+      <div className={`segmented${looks.length ? ' three' : ''}`} role="tablist">
         <button role="tab" aria-selected={tab === 'pts'} onClick={() => setTab('pts')}>Missões</button>
-        <button role="tab" aria-selected={tab === 'faces'} onClick={() => setTab('faces')}>Quem mais apareceu</button>
+        <button role="tab" aria-selected={tab === 'faces'} onClick={() => setTab('faces')}>{looks.length ? 'Aparições' : 'Quem mais apareceu'}</button>
+        {looks.length > 0 && <button role="tab" aria-selected={tab === 'looks'} onClick={() => setTab('looks')}>Melhor look</button>}
       </div>
       <ol className="ranking">
         {list.map((e, i) => (

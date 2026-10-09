@@ -9,6 +9,7 @@ interface Props {
   file: File
   onPost: (caption: string, frame: Frame, preview: string) => void
   onDiscard: () => void
+  postLabel: string
 }
 
 type Stage = 'zoom' | 'develop' | 'done'
@@ -20,7 +21,7 @@ const needsMotionPrompt =
 let motionAllowed = !needsMotionPrompt
 
 /** The moment after the shutter: the shot zooms out into a dark Polaroid and develops on shake or hold. */
-export function Develop({ file, onPost, onDiscard }: Props) {
+export function Develop({ file, onPost, onDiscard, postLabel }: Props) {
   const [url, setUrl] = useState<string>()
   const [stage, setStage] = useState<Stage>('zoom')
   // progress lives in a ref and a CSS variable: re-rendering React on every frame of a hold drops frames
@@ -169,7 +170,7 @@ export function Develop({ file, onPost, onDiscard }: Props) {
                 if (!url) return
                 posted.current = true
                 onPost(caption.trim(), frame, url)
-              }}>Postar no feed</button>
+              }}>{postLabel}</button>
           </>
         ) : (
           <>

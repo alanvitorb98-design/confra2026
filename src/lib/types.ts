@@ -18,8 +18,12 @@ export interface Guest {
   faceOptIn: boolean
 }
 
+/** party: photos during the party; look: the outfit wall, open only in the hours before it */
+export type Wall = 'party' | 'look'
+
 export interface Photo {
   id: string
+  kind: Wall
   author: string
   caption: string
   /** Full-quality original, shown in the viewer and used for the final album */

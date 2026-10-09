@@ -1,5 +1,5 @@
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { buzz } from '../lib/motion'
 import { REACTIONS, type Photo, type Reaction } from '../lib/types'
 import ClickSpark from './bits/ClickSpark'
@@ -9,9 +9,13 @@ interface Props {
   photos: Photo[]
   onReact: (id: string, r: Reaction, force?: boolean) => void
   onOpen: (photo: Photo) => void
+  /** what to say while the wall is empty */
+  empty: string
+  /** shown left of the stack/grid switch, e.g. the party/outfit wall switch */
+  header?: ReactNode
 }
 
-const time = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+const time = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
 const handle = (name: string) => '@' + name.toLowerCase().replace(/\s+/g, '.')
 
 const FLING_DISTANCE = 100
@@ -97,7 +101,7 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
 }
 
 /** Stack of Polaroids: fling the top one aside to see the next, double tap to react with 🔥. */
-export function Feed({ photos, onReact, onOpen }: Props) {
+export function Feed({ photos, onReact, onOpen, empty, header }: Props) {
   const [index, setIndex] = useState(0)
   const [burst, setBurst] = useState(0)
   const [view, setView] = useState<'stack' | 'grid'>('stack')
@@ -110,7 +114,13 @@ export function Feed({ photos, onReact, onOpen }: Props) {
   useEffect(() => setIndex(0), [newest])
   useEffect(() => () => clearTimeout(tapTimer.current), [])
 
-  if (count === 0) return <p className="page-lead">Nenhuma foto ainda. Toca no botão rosa e abre os trabalhos.</p>
+  if (count === 0)
+    return (
+      <div className="feed">
+        {header && <div className="feed-bar">{header}</div>}
+        <p className="feed-empty">{empty}</p>
+      </div>
+    )
 
   const top = photos[index % count]
   const shown = Math.min(VISIBLE, count)
@@ -130,9 +140,12 @@ export function Feed({ photos, onReact, onOpen }: Props) {
   }
 
   const toggle = (
-    <div className="segmented feed-toggle" role="tablist" aria-label="Visualização">
-      <button role="tab" aria-selected={view === 'stack'} onClick={() => setView('stack')}>Pilha</button>
-      <button role="tab" aria-selected={view === 'grid'} onClick={() => setView('grid')}>Grade</button>
+    <div className={`feed-bar${header ? ' split' : ''}`}>
+      {header}
+      <div className={`segmented feed-toggle${header ? ' compact' : ''}`} role="tablist" aria-label="Visualização">
+        <button role="tab" aria-selected={view === 'stack'} onClick={() => setView('stack')}>Pilha</button>
+        <button role="tab" aria-selected={view === 'grid'} onClick={() => setView('grid')}>Grade</button>
+      </div>
     </div>
   )
 

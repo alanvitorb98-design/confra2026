@@ -1,6 +1,33 @@
+import { EVENT, clock, type Phase } from '../lib/event'
 import type { Mission } from '../lib/types'
 
-export function Missions({ missions, onShoot }: { missions: Mission[]; onShoot: () => void }) {
+interface Props {
+  missions: Mission[]
+  onShoot: () => void
+  /** missions only run while the party is on */
+  locked: boolean
+  phase: Phase
+}
+
+export function Missions({ missions, onShoot, locked, phase }: Props) {
+  if (locked)
+    return (
+      <div className="page">
+        <h2 className="page-title">Missões</h2>
+        <p className="page-lead">
+          {phase === 'after' ? 'A festa acabou e as missões fecharam. Confere quem ganhou no Ranking!' : `As missões começam junto com a festa, às ${clock(EVENT.start)}. Fica de olho que elas chegam de surpresa.`}
+        </p>
+        <ul className="missions locked" aria-hidden>
+          {missions.slice(0, 3).map((m) => (
+            <li key={m.id} className="mission">
+              <span className="mission-title">Missão secreta</span>
+              <span className="mission-pts">🔒</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+
   const open = missions.filter((m) => !m.done)
   const done = missions.filter((m) => m.done)
   return (
