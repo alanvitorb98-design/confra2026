@@ -513,15 +513,17 @@ export function useParty(me: Guest | null) {
       await up(row.preview_path, previewBlob, 'image/jpeg')
       // party photos also get a 1600px copy for the face server, deleted after it is read
       if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
-      if (await r2On()) {
-        // straight to R2 with a short-lived link; the database notices the original isn't in its bucket
+      // straight to R2 with a short-lived link; the database notices the original isn't in its bucket.
+      // If R2 fails for any reason the original goes to the app's own bucket instead.
+      const toR2 = async () => {
         const { url, exists } = await r2Link('put', row.original_path)
-        if (!exists) {
-          const res = await fetch(url!, { method: 'PUT', body: stored, headers: { 'Content-Type': stored.type || 'image/jpeg' } })
-          if (!res.ok) throw new Error('r2 upload')
-        }
-        row = { ...row, on_r2: true }
-      } else await up(row.original_path, stored, stored.type || 'image/jpeg')
+        if (exists) return
+        const res = await fetch(url!, { method: 'PUT', body: stored, headers: { 'Content-Type': stored.type || 'image/jpeg' } })
+        if (!res.ok) throw new Error('r2 upload')
+      }
+      const onR2 = (await r2On()) && (await toR2().then(() => true, () => false))
+      if (onR2) row = { ...row, on_r2: true }
+      else await up(row.original_path, stored, stored.type || 'image/jpeg')
       const { error } = await db.rpc('send_photo', {
         p_id: row.id,
         p_kind: row.kind,
