@@ -1,14 +1,11 @@
 name: Face worker
 
 # Runs the face model (InsightFace, face-space/app.py) on GitHub's machines, free for public repos.
-# Every 30 minutes it clears the queue (selfies and stray photos) and stops. On the party day two long
-# runs cover 9h50 to about 21h30 Brasília, so photos are matched within seconds.
+# Started by the app's database (pg_cron + the rostos-cron function), because GitHub's own schedule runs
+# late or skips: short runs that clear the queue every 30 minutes from 06/11 20h, and on the party day two
+# long runs covering 9h50 to about 21h30 Brasília, so photos are matched within seconds.
 # Needs the FACE_SECRET repository secret, generated in the app's organizer panel.
 on:
-  schedule:
-    - cron: '*/30 * * * *'
-    - cron: '50 12 7 11 *'
-    - cron: '40 18 7 11 *'
   workflow_dispatch:
     inputs:
       minutes:
