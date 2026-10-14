@@ -44,6 +44,7 @@ export default function App() {
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
   const camera = useRef<HTMLInputElement>(null)
+  const gallery = useRef<HTMLInputElement>(null)
   const [code] = useState(eventCode)
   const [intro, setIntro] = useState(true)
   const [gate, setGate] = useState(() => !isInstalled())
@@ -161,10 +162,10 @@ export default function App() {
     setTab(next)
   }
 
-  const shoot = (missionId?: string) => {
+  const shoot = (missionId?: string, fromGallery = false) => {
     if (!canShoot) return
     setMissionShot(phase === 'party' ? missionId : undefined)
-    camera.current?.click()
+    ;(fromGallery ? gallery : camera).current?.click()
   }
 
   const post = (caption: string, frame: Frame, preview: string) => {
@@ -262,7 +263,12 @@ export default function App() {
       <nav className="tabbar">
         <button aria-current={tab === 'feed'} onClick={() => go('feed')}>Feed</button>
         <button aria-current={tab === 'missions'} onClick={() => go('missions')}>Missões</button>
-        <button className="shutter" onClick={() => shoot()} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
+        <div className="shoot-slot">
+          <button className="shutter" onClick={() => shoot()} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
+          <button className="gallery-pick" onClick={() => shoot(undefined, true)} disabled={!canShoot} aria-label="Escolher da galeria">
+            <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="2" /><path d="M4 18l5-5 4 4 3-3 4 4" /></svg>
+          </button>
+        </div>
         <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}>Ranking</button>
         <button aria-current={tab === 'me'} onClick={() => go('me')}>Eu</button>
       </nav>
@@ -270,6 +276,20 @@ export default function App() {
       <input
         ref={camera}
         id="camera"
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          e.target.value = ''
+          if (!f) return
+          playShutter()
+          setShot(f)
+        }}
+      />
+      <input
+        ref={gallery}
         type="file"
         accept="image/*"
         hidden
