@@ -44,6 +44,28 @@ export async function enablePush(code: string): Promise<PushState> {
   return 'on'
 }
 
+/**
+ * Push services drop subscriptions now and then (app reinstalled, data cleared, long idle), and the server
+ * stops sending to them. When that happened to this phone, sign it up again quietly. Run on app start.
+ */
+export async function healPush() {
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return
+    const sub = await subscription()
+    if (!sub) return
+    const auth = sub.toJSON().keys?.auth
+    const { data: alive } = await db.rpc('push_alive', { p_endpoint: sub.endpoint, p_auth: auth })
+    if (alive) return
+    await sub.unsubscribe()
+    const reg = await navigator.serviceWorker.ready
+    const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
+    const j = fresh.toJSON()
+    await db.rpc('save_push', { p_code: '', p_endpoint: fresh.endpoint, p_p256dh: j.keys?.p256dh, p_auth: j.keys?.auth })
+  } catch {
+    /* next start tries again */
+  }
+}
+
 export async function disablePush() {
   const sub = await subscription()
   if (!sub) return

@@ -10,6 +10,7 @@ import { Welcome } from './components/Welcome'
 import { AdminPanel } from './components/AdminPanel'
 import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
+import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
 import { PhaseBar } from './components/PhaseBar'
@@ -66,6 +67,11 @@ export default function App() {
   const [missionShot, setMissionShot] = useState<string>()
 
   // the organizer's dates and place
+  // daily reminders: re-register this phone if the push service dropped it
+  useEffect(() => {
+    healPush()
+  }, [])
+
   useEffect(() => {
     loadEvent(code).then((ok) => ok && setConfigLoaded((n) => n + 1))
   }, [code])
