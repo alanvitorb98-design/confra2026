@@ -61,6 +61,8 @@ export interface Mission {
   done: boolean
   /** who has to appear in the photo */
   target?: string
+  /** on a mission with people: everyone who has to appear */
+  people?: string[]
   /** last photo for it: still being checked, or the person wasn't found */
   status?: 'checking' | 'missed'
 }

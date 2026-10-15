@@ -229,6 +229,10 @@ export interface MissionRow {
   sort: number
   /** who has to appear in the photo (loose name match), or null */
   target: string | null
+  /** set on a mission with people, generated for this guest only */
+  owner?: string | null
+  /** guests who have to appear, on a mission with people */
+  targets?: string[] | null
 }
 
 interface ReactionRow {
@@ -262,7 +266,11 @@ function seeded(text: string) {
   return h >>> 0
 }
 
-export function useParty(me: Guest | null) {
+/** swaps of people per guest on missions with people (the server's event_config.gen_swaps enforces it) */
+const PEOPLE_SWAPS = 3
+
+/** peopleOn: missions with people are running (the party is on) */
+export function useParty(me: Guest | null, peopleOn = false) {
   const [guests, setGuests] = useState<Map<string, string>>(new Map())
   const [rows, setRows] = useState<Map<string, PhotoRow>>(new Map())
   const [reactions, setReactions] = useState<Map<string, ReactionRow>>(new Map())
@@ -309,7 +317,7 @@ export function useParty(me: Guest | null) {
     }
 
     const loadMissions = async () => {
-      const { data } = await db.from('missions').select('id,title,points,active,sort,target').order('sort')
+      const { data } = await db.from('missions').select('id,title,points,active,sort,target,owner,targets').order('sort')
       if (alive && data) setMissionRows(data as MissionRow[])
     }
 
@@ -449,7 +457,7 @@ export function useParty(me: Guest | null) {
 
   // a mission counts once per guest, from a photo the server accepted for it (when it names someone,
   // that person's face has to be found in the photo)
-  const { missions, points } = useMemo(() => {
+  const { missions, points, peopleOpen, peopleDone, swapsUsed } = useMemo(() => {
     const done = new Set<string>()
     const checking = new Set<string>()
     const missed = new Set<string>()
@@ -468,7 +476,7 @@ export function useParty(me: Guest | null) {
     const value = new Map(missionRows.map((m) => [m.id, m.points]))
     // each guest gets the missions in their own random order, the same on every load (seeded by their id)
     const missions: Mission[] = missionRows
-      .filter((m) => m.active || done.has(m.id))
+      .filter((m) => !m.owner && (m.active || done.has(m.id)))
       .map((m) => ({
         id: m.id,
         title: m.title,
@@ -478,12 +486,49 @@ export function useParty(me: Guest | null) {
         status: done.has(m.id) ? undefined : checking.has(m.id) ? ('checking' as const) : missed.has(m.id) ? ('missed' as const) : undefined,
       }))
       .sort((a, b) => seeded(`${me?.id}:${a.id}`) - seeded(`${me?.id}:${b.id}`))
+    // missions with people, generated for me: the open one and the ones done, newest first
+    const mine = missionRows.filter((m) => m.owner === me?.id).sort((a, b) => b.sort - a.sort)
+    const asMission = (m: MissionRow): Mission => ({
+      id: m.id,
+      title: m.title,
+      points: m.points,
+      people: (m.targets ?? []).map((id) => guests.get(id) ?? 'Convidado'),
+      done: done.has(m.id),
+      status: done.has(m.id) ? undefined : checking.has(m.id) ? ('checking' as const) : missed.has(m.id) ? ('missed' as const) : undefined,
+    })
+    const peopleOpen = mine.find((m) => m.active && !done.has(m.id))
+    const peopleDone = mine.filter((m) => done.has(m.id)).map(asMission)
+    const swapsUsed = mine.filter((m) => !m.active && !done.has(m.id)).length
     const points = [...byGuest]
       .map(([g, set]) => ({ name: guests.get(g) ?? 'Convidado', value: [...set].reduce((a, id) => a + (value.get(id) ?? 0), 0) }))
       .filter((e) => e.value > 0)
       .sort((a, b) => b.value - a.value)
-    return { missions, points }
+    return { missions, points, peopleOpen: peopleOpen && asMission(peopleOpen), peopleDone, swapsUsed }
   }, [rows, local, missionRows, guests, me?.id])
+
+  // missions with people: ask the server for my open one (it creates the next when the last is done, or
+  // says how many guests are still missing to unlock them)
+  const [peopleNeed, setPeopleNeed] = useState<number>()
+  const [peopleOff, setPeopleOff] = useState(false)
+  const peopleKey = `${peopleOpen?.id ?? '-'}:${peopleDone.length}:${guests.size}`
+  useEffect(() => {
+    if (!me || !peopleOn || peopleOpen) return
+    let alive = true
+    call<{ id: string | null; need?: number; off?: boolean }>('people_mission').then(
+      (r) => {
+        if (!alive) return
+        setPeopleNeed(r.id ? undefined : r.need)
+        setPeopleOff(!!r.off)
+      },
+      () => undefined,
+    )
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id, peopleOn, peopleKey])
+  const people = { current: peopleOpen, done: peopleDone, need: peopleNeed, off: peopleOff, swapsLeft: Math.max(0, PEOPLE_SWAPS - swapsUsed) }
+  const swapPeople = (id: string) => call<{ id: string }>('people_swap', { p_id: id })
 
   const hide = async (photoId: string) => {
     const { error } = await db.rpc('hide_photo', { p_id: photoId })
@@ -598,5 +643,5 @@ export function useParty(me: Guest | null) {
     if (l) void send(l)
   }
 
-  return { photos, guests, state, missions, allMissions: missionRows, points, appearances, eventVersion, react, post, retry, hide, reconnect: () => setReload((n) => n + 1) }
+  return { photos, guests, state, missions, people, swapPeople, allMissions: missionRows.filter((m) => !m.owner), points, appearances, eventVersion, react, post, retry, hide, reconnect: () => setReload((n) => n + 1) }
 }
