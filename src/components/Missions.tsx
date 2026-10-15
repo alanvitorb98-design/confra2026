@@ -1,3 +1,4 @@
+import { CheckIcon, LockIcon } from './Icons'
 import { EVENT, clock, type Phase } from '../lib/event'
 import type { Mission } from '../lib/types'
 
@@ -22,7 +23,7 @@ export function Missions({ missions, onShoot, locked, phase }: Props) {
           {missions.slice(0, 3).map((m) => (
             <li key={m.id} className="mission">
               <span className="mission-title">Missão secreta</span>
-              <span className="mission-pts">🔒</span>
+              <span className="mission-pts"><LockIcon /></span>
             </li>
           ))}
         </ul>
@@ -59,14 +60,14 @@ export function Missions({ missions, onShoot, locked, phase }: Props) {
         {left > 0 && (
           <li className="mission next" aria-label={`Mais ${left} ${left === 1 ? 'missão' : 'missões'} depois desta`}>
             <span className="mission-title">{left === 1 ? 'Mais 1 missão' : `Mais ${left} missões`} depois desta</span>
-            <span className="mission-pts">🔒</span>
+            <span className="mission-pts"><LockIcon /></span>
           </li>
         )}
         {!current && missions.length > 0 && <li className="mission all-done"><span className="mission-title">Você cumpriu todas! Se aparecer missão nova, ela chega aqui.</span></li>}
         {done.map((m) => (
           <li key={m.id} className="mission done">
             <span className="mission-title">{m.title}</span>
-            <span className="mission-pts">✓ {m.points}</span>
+            <span className="mission-pts"><CheckIcon /> {m.points}</span>
           </li>
         ))}
       </ul>

@@ -9,6 +9,7 @@ import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
 import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
+import { TabIcon } from './components/Icons'
 import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
@@ -266,16 +267,16 @@ export default function App() {
       </main>
 
       <nav className="tabbar">
-        <button aria-current={tab === 'feed'} onClick={() => go('feed')}>Feed</button>
-        <button aria-current={tab === 'missions'} onClick={() => go('missions')}>Missões</button>
+        <button aria-current={tab === 'feed'} onClick={() => go('feed')}><TabIcon name="feed" active={tab === 'feed'} />Feed</button>
+        <button aria-current={tab === 'missions'} onClick={() => go('missions')}><TabIcon name="missions" active={tab === 'missions'} />Missões</button>
         <div className="shoot-slot">
           <button className="shutter" onClick={() => shoot()} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
           <button className="gallery-pick" onClick={() => shoot(undefined, true)} disabled={!canShoot} aria-label="Escolher da galeria">
             <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="2" /><path d="M4 18l5-5 4 4 3-3 4 4" /></svg>
           </button>
         </div>
-        <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}>Ranking</button>
-        <button aria-current={tab === 'me'} onClick={() => go('me')}>Eu</button>
+        <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}><TabIcon name="ranking" active={tab === 'ranking'} />Ranking</button>
+        <button aria-current={tab === 'me'} onClick={() => go('me')}><TabIcon name="me" active={tab === 'me'} />Eu</button>
       </nav>
 
       <input
