@@ -1,3 +1,4 @@
+import { SelfieIcon } from './Icons'
 import { useState } from 'react'
 import { JoinError } from '../lib/backend'
 import type { Guest } from '../lib/types'
@@ -71,7 +72,7 @@ export function Welcome({ code, onEnter }: { code: string; onEnter: (code: strin
           </div>
           {faceOptIn && (
             <button type="button" className="selfie" onClick={() => setCam(true)}>
-              {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty">+</span>}
+              {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty"><SelfieIcon /></span>}
               <span>{selfieUrl ? 'Trocar selfie' : 'Tirar minha selfie'}</span>
             </button>
           )}
