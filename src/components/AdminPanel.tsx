@@ -30,10 +30,11 @@ const mb = (b: number) => (b / 1024 / 1024).toLocaleString('pt-BR', { maximumFra
 interface Props {
   missions: MissionRow[]
   onClose: () => void
+  onTelao: () => void
 }
 
 /** Organizer-only settings. The database checks the organizer flag again on every call. */
-export function AdminPanel({ missions, onClose }: Props) {
+export function AdminPanel({ missions, onClose, onTelao }: Props) {
   const [ev, setEv] = useState<AdminEvent>()
   const [qr, setQr] = useState<string>()
   const [stats, setStats] = useState<{ guests: number; photos: number; bytes: number }>()
@@ -109,6 +110,12 @@ export function AdminPanel({ missions, onClose }: Props) {
           <div><dt>Espaço</dt><dd>{mb(stats.bytes)}<small> / 1024 MB</small></dd></div>
         </dl>
       )}
+
+      <section className="panel admin-section">
+        <h3>Telão</h3>
+        <p className="page-note">Abre num notebook ligado no projetor ou na TV. Passa as últimas fotos sozinho e mostra cada foto nova assim que chega, com o QR pra quem quiser entrar. Esc ou dois toques saem.</p>
+        <button className="btn primary small" onClick={onTelao}>Abrir telão</button>
+      </section>
 
       <section className="panel admin-section">
         <h3>Convite</h3>
