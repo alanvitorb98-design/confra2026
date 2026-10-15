@@ -86,7 +86,10 @@ def signatures(img, largest_only=False):
     faces = selfie_faces(img) if largest_only else detect(img)
     if largest_only and faces:
         faces = [max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))]
-    return [[round(float(x), 6) for x in f.normed_embedding] for f in faces]
+    h, w = img.shape[:2]
+    # where each face is, in fractions of the photo, so the app can let people tap it
+    boxes = [[round(float(v), 4) for v in (f.bbox[0] / w, f.bbox[1] / h, (f.bbox[2] - f.bbox[0]) / w, (f.bbox[3] - f.bbox[1]) / h)] for f in faces]
+    return [[round(float(x), 6) for x in f.normed_embedding] for f in faces], boxes
 
 
 def call(op, body=None):
@@ -104,11 +107,11 @@ def work_once():
     for job in jobs:
         try:
             img = read_image(job["url"])
-            emb = signatures(img, largest_only=job["kind"] == "selfie")
+            emb, boxes = signatures(img, largest_only=job["kind"] == "selfie")
             # sizes and counts only, never the image: tells why a selfie found no face
             print(f"{job['kind']}: {img.shape[1]}x{img.shape[0]}, {len(emb)} rosto(s)", flush=True)
             del img
-            call("save", {"kind": job["kind"], "id": job["id"], "embeddings": emb})
+            call("save", {"kind": job["kind"], "id": job["id"], "embeddings": emb, "boxes": boxes})
             status["done"] += 1
         except Exception as e:  # one bad photo must not stop the queue
             status["errors"] += 1

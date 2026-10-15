@@ -319,6 +319,9 @@ export default function App() {
         <Viewer
           photo={open}
           canRemove={open.authorId === guest.id || isAdmin}
+          canTag={open.kind === 'party' && (open.authorId === guest.id || isAdmin)}
+          me={guest.id}
+          guests={party.guests}
           onRemove={async () => {
             await party.hide(open.id)
             setOpen(null)
