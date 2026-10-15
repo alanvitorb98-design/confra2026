@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
+import { stripGps } from './exif'
 import { makePreview, storageCopy } from './preview'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
 
@@ -517,7 +518,8 @@ export function useParty(me: Guest | null) {
     try {
       const previewBlob = await fetch(preview).then((r) => r.blob())
       // the server keeps a full-resolution JPEG at 92%; this phone keeps the camera file
-      const stored = await storageCopy(file)
+      // the copy never carries where the photo was taken (gallery photos keep their EXIF otherwise)
+      const stored = await stripGps(await storageCopy(file))
       if (stored !== file) row = { ...row, original_path: row.original_path.replace(/\.[^.]+$/, '.jpg'), bytes: stored.size }
       const up = async (path: string, body: Blob, type: string) => {
         const { error } = await db.storage.from(BUCKET).upload(path, body, { contentType: type, cacheControl: '31536000', upsert: false })
