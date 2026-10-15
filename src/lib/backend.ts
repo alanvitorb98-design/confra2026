@@ -260,6 +260,8 @@ interface PhotoRow {
   mission_ok?: boolean | null
   /** the original is on Cloudflare R2 instead of the bucket */
   on_r2?: boolean
+  /** posted by an organizer outside the hours: only organizers see it */
+  test?: boolean
 }
 
 export interface MissionRow {
@@ -471,6 +473,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       mine: mine.get(row.id) ?? {},
       missionId: row.mission_id ?? undefined,
       faces: [...(faces.get(row.id) ?? [])].map((g) => guests.get(g) ?? 'Convidado'),
+      test: row.test,
     })
     for (const l of local.values()) all.set(l.row.id, toPhoto(rows.get(l.row.id) ?? l.row, l))
     for (const row of rows.values()) if (!all.has(row.id)) all.set(row.id, toPhoto(row))

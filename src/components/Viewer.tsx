@@ -114,6 +114,7 @@ export function Viewer({ photo, onClose, canRemove, onRemove, me, canTag, guests
         <div className="viewer-text">
           <span>{photo.caption}</span>
           <span className="viewer-author">por {photo.author}</span>
+          {photo.test && <span className="viewer-hint">Foto de teste: só a organização vê</span>}
           {photo.faces && photo.faces.length > 0 && <span className="viewer-faces">Aparece: {photo.faces.join(', ')}</span>}
           {canTag && live && <span className="viewer-hint">Toca num rosto pra marcar quem é</span>}
         </div>

@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useState } from 'react'
-import { APP_OPENS, EVENT, clock, day, setTestClock, split, testClock, testMoments, useNow } from '../lib/event'
+import { APP_OPENS, EVENT, clock, day, split, useNow } from '../lib/event'
 import { Reminders } from './Reminders'
 import { PlaceMap } from './PlaceMap'
 import { Logo } from './Logo'
@@ -33,9 +33,6 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
   const t = useNow(true)
   const left = split(EVENT.start.getTime() - t)
   const [place, setPlace] = useState(false)
-  // test mode only: five taps on the logo open a menu to jump to any phase on this phone
-  const [taps, setTaps] = useState(0)
-  const tapLogo = () => EVENT.testMode && setTaps((n) => n + 1)
   // organizers get into the app before it opens, to set up missions and times
   const [org, setOrg] = useState(false)
   const [orgCode, setOrgCode] = useState('')
@@ -43,7 +40,7 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
   return (
     <div className="countdown">
       <PartyScene variant="ambient" />
-      <div className="logo-block" onClick={tapLogo}>
+      <div className="logo-block">
         <Logo />
         <p className="logo-sub">Equipe Derhu</p>
       </div>
@@ -106,21 +103,6 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
         <button className="cd-org" onClick={() => setOrg(true)}>Sou da organização</button>
       )}
 
-      {taps >= 5 && (
-        <div className="cd-test" role="dialog" aria-label="Testar o app">
-          <b>Testar o app neste celular</b>
-          <p>Escolha uma fase. O relógio de teste some sozinho quando o modo teste for desligado no painel.</p>
-          <div className="cd-actions">
-            {testMoments().map((m) => (
-              <button key={m.label} className="btn ghost small" onClick={() => { setTestClock(new Date(m.at).toISOString()); location.reload() }}>
-                {m.label}
-              </button>
-            ))}
-            {testClock && <button className="btn ghost small" onClick={() => { setTestClock(null); location.reload() }}>Hora real</button>}
-            <button className="btn ghost small" onClick={() => setTaps(0)}>Fechar</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
