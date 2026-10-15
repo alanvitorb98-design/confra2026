@@ -10,6 +10,7 @@ import { Welcome } from './components/Welcome'
 import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
 import { TabIcon } from './components/Icons'
+import { Shutter } from './components/Shutter'
 import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
@@ -270,7 +271,7 @@ export default function App() {
         <button aria-current={tab === 'feed'} onClick={() => go('feed')}><TabIcon name="feed" active={tab === 'feed'} />Feed</button>
         <button aria-current={tab === 'missions'} onClick={() => go('missions')}><TabIcon name="missions" active={tab === 'missions'} />Missões</button>
         <div className="shoot-slot">
-          <button className="shutter" onClick={() => shoot()} disabled={!canShoot} aria-label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'}><span /></button>
+          <Shutter onShoot={() => shoot()} disabled={!canShoot} label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'} />
           <button className="gallery-pick" onClick={() => shoot(undefined, true)} disabled={!canShoot} aria-label="Escolher da galeria">
             <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="2" /><path d="M4 18l5-5 4 4 3-3 4 4" /></svg>
           </button>
