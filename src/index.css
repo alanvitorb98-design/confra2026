@@ -146,13 +146,13 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
   background: linear-gradient(160deg, #fff6d4, var(--gold) 45%, #8f6408);
   box-shadow: inset 0 2px 1px rgb(255 255 255 / .9), inset 0 -3px 6px rgb(90 60 10 / .45), 0 10px 22px rgb(90 60 10 / .35);
 }
-.tabbar .shutter span {
+.tabbar .shutter svg {
   display: block; width: 100%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #5a5148 0 10%, var(--ink) 45%, #000 100%);
-  box-shadow: inset 0 -4px 8px rgb(0 0 0 / .5), inset 0 3px 4px rgb(255 255 255 / .2), 0 0 0 3px rgb(90 60 10 / .25);
-  transition: transform .12s;
+  box-shadow: inset 0 -4px 8px rgb(0 0 0 / .5), 0 0 0 3px rgb(90 60 10 / .25);
+  touch-action: manipulation;
 }
-.tabbar .shutter:active span { transform: scale(.9); }
+.shutter-blade { fill: url(#blade-metal); stroke: rgb(255 240 200 / .16); stroke-width: .6; stroke-linejoin: round; }
+.tabbar .shutter:disabled svg { filter: saturate(.4) brightness(.9); }
 .tabbar .shoot-slot { position: relative; height: 100%; display: grid; place-items: center; }
 .tabbar .gallery-pick {
   position: absolute; left: -30px; top: -34px; width: 38px; height: 38px; padding: 0; border-radius: 50%;
