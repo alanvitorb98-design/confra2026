@@ -273,7 +273,12 @@ export default function App() {
         <div className="shoot-slot">
           <Shutter onShoot={() => shoot()} disabled={!canShoot} label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'} />
           <button className="gallery-pick" onClick={() => shoot(undefined, true)} disabled={!canShoot} aria-label="Escolher da galeria">
-            <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="9" cy="10" r="2" /><path d="M4 18l5-5 4 4 3-3 4 4" /></svg>
+            <svg viewBox="0 0 24 24" aria-hidden>
+              <rect x="3.5" y="5" width="12" height="14" rx="1" transform="rotate(-10 9.5 12)" fill="#fffdf7" stroke="var(--ink)" strokeWidth="1.6" />
+              <rect x="8" y="5" width="12.5" height="14.5" rx="1" fill="#fffdf7" stroke="var(--ink)" strokeWidth="1.6" />
+              <rect x="10" y="7" width="8.5" height="8" fill="var(--gold)" stroke="var(--ink)" strokeWidth="1.2" />
+              <path d="M10 13.6l2.6-2.4 2 1.8 1.4-1.2 2.5 2.3" fill="none" stroke="var(--ink)" strokeWidth="1.1" strokeLinejoin="round" />
+            </svg>
           </button>
         </div>
         <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}><TabIcon name="ranking" active={tab === 'ranking'} />Ranking</button>
