@@ -19,6 +19,10 @@ concurrency:
 jobs:
   work:
     runs-on: ubuntu-latest
+    # long runs (the party) get two servers side by side; the queue gives each photo to only one of them
+    strategy:
+      matrix:
+        worker: ${{ fromJSON((inputs.minutes != '' && inputs.minutes != '0') && '[1, 2]' || '[1]') }}
     timeout-minutes: 355
     env:
       FACE_SECRET: ${{ secrets.FACE_SECRET }}

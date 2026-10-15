@@ -30,25 +30,21 @@ Deno.serve(async (req) => {
 
   if (op === 'queue') {
     const jobs: { kind: 'selfie' | 'photo'; id: string; url: string }[] = []
-    const { data: selfies } = await db.from('guests').select('id,selfie_path').eq('face_status', 'pending').not('selfie_path', 'is', null).limit(4)
-    for (const g of selfies ?? []) {
+    // each job goes to one server only, so several can work at once (claimed for 5 minutes)
+    const { data: claimed } = await db.rpc('face_claim', { p_selfies: 4, p_photos: 6 })
+    const { selfies = [], photos = [] } = (claimed ?? {}) as {
+      selfies?: { id: string; selfie_path: string }[]
+      photos?: { id: string; original_path: string; preview_path: string }[]
+    }
+    for (const g of selfies) {
       const url = await link(g.selfie_path)
       if (url) jobs.push({ kind: 'selfie', id: g.id, url })
       else await db.from('guests').update({ face_status: 'failed' }).eq('id', g.id)
     }
-    // photos wait until someone has a selfie to look for
-    const { count } = await db.from('face_refs').select('guest_id', { count: 'exact', head: true }).not('embedding', 'is', null)
-    if ((count ?? 0) > 0) {
-      const { data: photos } = await db
-        .from('photos')
-        .select('id,original_path,preview_path')
-        .eq('faces_status', 'pending').eq('kind', 'party').is('removed_at', null)
-        .order('created_at').limit(6)
-      for (const p of photos ?? []) {
-        const url = (await link(analysisPath(p.original_path))) ?? (await link(p.preview_path))
-        if (url) jobs.push({ kind: 'photo', id: p.id, url })
-        else await db.from('photos').update({ faces_status: 'failed' }).eq('id', p.id)
-      }
+    for (const p of photos) {
+      const url = (await link(analysisPath(p.original_path))) ?? (await link(p.preview_path))
+      if (url) jobs.push({ kind: 'photo', id: p.id, url })
+      else await db.from('photos').update({ faces_status: 'failed' }).eq('id', p.id)
     }
     return json(200, { jobs })
   }
