@@ -4,6 +4,7 @@ import { playReveal } from '../lib/sound'
 import { FRAMES, type Frame } from '../lib/types'
 import { frameClass } from '../lib/frame'
 import { makePreview } from '../lib/preview'
+import { shareOrDownload } from '../lib/download'
 
 interface Props {
   file: File
@@ -31,6 +32,7 @@ export function Develop({ file, onPost, onDiscard, postLabel }: Props) {
   const posted = useRef(false)
   const [caption, setCaption] = useState('')
   const [frame, setFrame] = useState<Frame>('classic')
+  const [saved, setSaved] = useState(false)
   const [canShake, setCanShake] = useState(motionAllowed)
   const holding = useRef(false)
   const raf = useRef(0)
@@ -166,6 +168,10 @@ export function Develop({ file, onPost, onDiscard, postLabel }: Props) {
               ))}
             </div>
             <button className="btn ghost" onClick={onDiscard}>Descartar</button>
+            {/* keeps the photo on this phone only: nothing goes to the server */}
+            <button className="btn ghost" onClick={() => void shareOrDownload(new File([file], `confra26-${Date.now()}${/\.[a-z0-9]{2,5}$/i.exec(file.name)?.[0] ?? '.jpg'}`, { type: file.type || 'image/jpeg' })).then((r) => r !== 'cancelled' && setSaved(true))}>
+              {saved ? 'Salva ✓' : 'Salvar no celular'}
+            </button>
             <button className="btn primary" onClick={() => {
                 if (!url) return
                 posted.current = true
