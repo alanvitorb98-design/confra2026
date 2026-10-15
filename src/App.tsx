@@ -1,5 +1,5 @@
 import { AnimatePresence } from 'motion/react'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Develop } from './components/Develop'
 import { Feed } from './components/Feed'
 import { Missions } from './components/Missions'
@@ -8,6 +8,7 @@ import { Ranking } from './components/Ranking'
 import { Viewer } from './components/Viewer'
 import { Welcome } from './components/Welcome'
 import { AdminPanel } from './components/AdminPanel'
+import { Telao } from './components/Telao'
 import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
@@ -64,6 +65,8 @@ export default function App() {
   const [, setConfigLoaded] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
   const [panel, setPanel] = useState(false)
+  const [telao, setTelao] = useState(false)
+  const closeTelao = useCallback(() => setTelao(false), [])
   // which mission the photo being taken is for
   const [missionShot, setMissionShot] = useState<string>()
 
@@ -201,6 +204,8 @@ export default function App() {
             : 'Ninguém postou look dessa vez.'
           : 'Nenhuma foto ainda. Toca no botão e abre os trabalhos.'
 
+  if (telao && isAdmin) return <Telao photos={photos} onClose={closeTelao} />
+
   return (
     <div className="app">
       <PartyScene variant="ambient" />
@@ -213,7 +218,7 @@ export default function App() {
 
       <main>
         {panel && isAdmin ? (
-          <AdminPanel missions={party.allMissions} onClose={() => setPanel(false)} />
+          <AdminPanel missions={party.allMissions} onClose={() => setPanel(false)} onTelao={() => setTelao(true)} />
         ) : (
         <>
         {tab === 'feed' && (
