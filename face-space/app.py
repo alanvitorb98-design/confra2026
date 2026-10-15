@@ -20,9 +20,10 @@ import requests
 
 FACES_URL = os.environ.get("FACES_URL", "https://optapzbhyhklcirdoyid.supabase.co/functions/v1/faces")
 SECRET = os.environ.get("FACE_SECRET", "")
-MAX_SIDE = 1600  # enough to find faces in group shots; bigger only costs time
+MAX_SIDE = 2400  # big group shots keep faces in the back row big enough to find
 MIN_FACE = 36  # pixels; smaller faces are too blurry to recognize reliably
 MIN_SCORE = 0.6  # detector confidence
+DET = 1024  # detector window; a bigger photo is also read in overlapping tiles of this size
 
 _model = None
 status = {"started": time.time(), "done": 0, "errors": 0, "last": None, "note": "starting"}
@@ -34,7 +35,7 @@ def load_model():
         from insightface.app import FaceAnalysis
 
         fa = FaceAnalysis(name="buffalo_l", providers=["CPUExecutionProvider"], allowed_modules=["detection", "recognition"])
-        fa.prepare(ctx_id=-1, det_size=(1024, 1024))
+        fa.prepare(ctx_id=-1, det_size=(DET, DET))
         _model = fa
     return _model
 
@@ -52,12 +53,38 @@ def read_image(url):
     return img
 
 
-def detect(img):
-    return [
-        f
-        for f in load_model().get(img)
-        if f.det_score >= MIN_SCORE and min(f.bbox[2] - f.bbox[0], f.bbox[3] - f.bbox[1]) >= MIN_FACE
-    ]
+def keep(faces):
+    return [f for f in faces if f.det_score >= MIN_SCORE and min(f.bbox[2] - f.bbox[0], f.bbox[3] - f.bbox[1]) >= MIN_FACE]
+
+
+def iou(a, b):
+    x1, y1, x2, y2 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0, x2 - x1) * max(0, y2 - y1)
+    return inter / ((a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - inter + 1e-9)
+
+
+def detect(img, tiles=False):
+    """Faces in the photo. With tiles, a big photo is also read in overlapping tiles at full size: the
+    whole-photo pass shrinks it to the detector window, and small faces in the back of a group shot get lost."""
+    faces = keep(load_model().get(img))
+    h, w = img.shape[:2]
+    if not tiles or max(h, w) <= DET * 1.25:
+        return faces
+    step = int(DET * 0.75)
+    for y in range(0, max(1, h - DET // 4), step):
+        for x in range(0, max(1, w - DET // 4), step):
+            y0, x0 = min(y, max(0, h - DET)), min(x, max(0, w - DET))
+            tile = np.ascontiguousarray(img[y0 : y0 + DET, x0 : x0 + DET])
+            th, tw = tile.shape[:2]
+            for f in keep(load_model().get(tile)):
+                b = f.bbox
+                # cut by the tile edge: the neighbor tile or the whole-photo pass sees it whole
+                if (b[0] < 2 and x0 > 0) or (b[1] < 2 and y0 > 0) or (b[2] > tw - 2 and x0 + tw < w) or (b[3] > th - 2 and y0 + th < h):
+                    continue
+                f.bbox = b + np.array([x0, y0, x0, y0], dtype=b.dtype)
+                if not any(iou(f.bbox, g.bbox) > 0.3 for g in faces):
+                    faces.append(f)
+    return faces
 
 
 def shrunk(img, side):
@@ -83,7 +110,7 @@ def selfie_faces(img):
 
 
 def signatures(img, largest_only=False):
-    faces = selfie_faces(img) if largest_only else detect(img)
+    faces = selfie_faces(img) if largest_only else detect(img, tiles=True)
     if largest_only and faces:
         faces = [max(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]))]
     h, w = img.shape[:2]
