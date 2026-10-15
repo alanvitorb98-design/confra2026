@@ -1,9 +1,13 @@
 import { motion } from 'motion/react'
+import { useState } from 'react'
 import { Logo } from './Logo'
 import { PartyScene } from './PartyScene'
+import { termsAccepted } from '../lib/terms'
+import { Terms } from './Terms'
 
 /** Opening shot: fireworks pop around the invitation title, glasses slide in. Tap the button to go in. */
 export function Splash({ onDone }: { onDone: () => void }) {
+  const [terms, setTerms] = useState(false)
   return (
     <motion.div className="splash" exit={{ opacity: 0 }}>
       <PartyScene variant="intro" />
@@ -22,7 +26,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
 
       <motion.button
         className="btn primary splash-go"
-        onClick={onDone}
+        onClick={() => (termsAccepted() ? onDone() : setTerms(true))}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ delay: 1.7, type: 'spring', stiffness: 260, damping: 16 }}
@@ -30,6 +34,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
       >
         Bora!
       </motion.button>
+      {terms && <Terms onAccept={onDone} />}
     </motion.div>
   )
 }

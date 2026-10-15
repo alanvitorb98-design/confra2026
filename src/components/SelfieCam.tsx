@@ -82,7 +82,7 @@ export function SelfieCam({ onShot, onClose }: { onShot: (f: File) => void; onCl
       <input ref={fallback} type="file" accept="image/*" capture="user" hidden onChange={(e) => e.target.files?.[0] && onShot(e.target.files[0])} />
       {failed ? (
         <div className="selfie-cam-fail">
-          <p>Não consegui abrir a câmera aqui. Tira pela câmera do celular: de frente, com o rosto inteiro e um pouco de espaço em volta.</p>
+          <p>Não consegui abrir a câmera aqui. Tira pela câmera do celular: de frente, com o rosto inteiro e um pouco de espaço em volta. Não use selfie de crianças nem de menores de 16 anos.</p>
           <button className="btn primary" onClick={() => fallback.current?.click()}>Abrir câmera</button>
         </div>
       ) : (
@@ -90,7 +90,7 @@ export function SelfieCam({ onShot, onClose }: { onShot: (f: File) => void; onCl
           <video ref={video} playsInline muted />
           <div className="selfie-guide" aria-hidden />
           <p className={`selfie-light ${light ?? ''}`} role="status">{light ? LIGHT_TEXT[light] : 'Abrindo a câmera…'}</p>
-          <p className="selfie-tip">Encaixe a cabeça inteira no contorno, sem óculos escuros</p>
+          <p className="selfie-tip">Encaixe a cabeça inteira no contorno, sem óculos escuros. Não use selfie de crianças nem de menores de 16 anos.</p>
           <button className="selfie-shoot" onClick={shoot} disabled={!light} aria-label="Tirar selfie"><span /></button>
         </>
       )}
