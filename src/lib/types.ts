@@ -41,6 +41,8 @@ export interface Photo {
   bytes?: number
   /** Names the face server recognized in the photo */
   faces?: string[]
+  /** An organizer's test, only organizers see it */
+  test?: boolean
   /** Set when the photo was taken for a mission */
   missionId?: string
   /** Only on photos sent from this phone that have not reached the server yet */

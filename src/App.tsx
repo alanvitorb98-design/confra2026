@@ -17,7 +17,7 @@ import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
 import { PhaseBar } from './components/PhaseBar'
-import { LOOK_CLOSES, clock, lookOpen, phaseAt, testClock, useNow } from './lib/event'
+import { LOOK_CLOSES, clock, lookOpen, phaseAt, setTestClock, testClock, useNow } from './lib/event'
 import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
 import { Splash } from './components/Splash'
@@ -89,6 +89,11 @@ export default function App() {
       setIsAdmin(yes)
       // a wrong organizer code sends this phone back to the countdown
       if (!yes && orgCode) forgetOrg()
+      // the test clock is for organizers: anyone else stays on the real time
+      if (!yes && testClock) {
+        setTestClock(null)
+        location.reload()
+      }
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [guest, orgCode])

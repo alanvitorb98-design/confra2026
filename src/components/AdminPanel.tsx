@@ -130,6 +130,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
       {ev && (
         <section className="panel admin-section">
           <h3>Horários <small>(Brasília)</small></h3>
+          <p className="page-note">Mudar um horário muda o app de todo mundo. Pra só ver uma fase, use Testes lá embaixo.</p>
           {TIMES.map((t) => (
             <label key={t.key} className="field">
               <span>{t.label}</span>
@@ -153,13 +154,6 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
           <button className="btn ghost small" onClick={findOnMap} disabled={busy || !(ev.address || ev.place)}>Achar no mapa</button>
           <PlaceMap lat={ev.lat} lng={ev.lng} />
 
-          <label className="admin-toggle">
-            <input type="checkbox" checked={ev.test_mode} onChange={(e) => set('test_mode', e.target.checked)} />
-            <span>
-              <b>Modo teste</b>
-              <small>Aceita fotos fora dos horários. Desliga antes da festa.</small>
-            </span>
-          </label>
 
           <button className="btn primary wide" disabled={busy} onClick={() => run(() => admin.saveEvent(ev), 'Salvo. Todo mundo vê na hora.')}>
             Salvar evento
@@ -268,7 +262,10 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
 
       <section className="panel admin-section">
         <h3>Testes</h3>
-        <p className="page-note">Simula o horário só neste celular, pra ver cada fase do app.{testClock && ' Simulação ligada.'}</p>
+        <p className="page-note">
+          Tudo aqui vale só pra organização. Simular o horário muda só este celular. Fotos postadas fora do horário da festa ou do look
+          são de teste: só quem é da organização vê, e o app dos convidados continua igual.{testClock && ' Simulação ligada.'}
+        </p>
         <div className="admin-row wrap">
           {testMoments().map((p) => (
             <button key={p.label} className="btn ghost small" onClick={() => (location.href = `${APP_URL}?agora=${toLocal(new Date(p.at).toISOString())}`)}>{p.label}</button>
@@ -278,7 +275,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
         <button
           className="btn ghost small danger"
           disabled={busy}
-          onClick={() => confirm('Tirar do app todas as fotos e reações postadas até agora?') && run(async () => { const n = await admin.clearPhotos(); setStats(await admin.stats()); return n }, 'Fotos de teste removidas do app.')}
+          onClick={() => confirm('Tirar do app as fotos de teste da organização? Fotos dos convidados ficam.') && run(async () => { const n = await admin.clearPhotos(); setStats(await admin.stats()); return n }, 'Fotos de teste removidas do app.')}
         >
           Limpar fotos de teste
         </button>

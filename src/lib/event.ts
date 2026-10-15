@@ -11,7 +11,6 @@ export const EVENT = {
   mapsUrl: '',
   lat: null as number | null,
   lng: null as number | null,
-  testMode: false,
 }
 
 /** The app opens one day before the party */
@@ -44,12 +43,6 @@ export function applyConfig(c: EventConfig, cache = true) {
   APP_OPENS = date(c.app_opens, APP_OPENS)
   LOOK_OPENS = date(c.look_opens, LOOK_OPENS)
   LOOK_CLOSES = date(c.look_closes, LOOK_CLOSES)
-  EVENT.testMode = !!c.test_mode
-  // test mode off on the server: no phone stays on a simulated clock
-  if (cache && !c.test_mode && testClock) {
-    setTestClock(null)
-    location.reload()
-  }
   // the place only comes with the code: never forget it because a later answer came without
   if (c.place) {
     EVENT.place = c.place
@@ -86,7 +79,8 @@ export function phaseAt(now: number): Phase {
 }
 
 // Test clock: open the app with ?agora=2026-11-07T08:00 to see any phase, ?agora=off to go back.
-// Kept on the phone (so it also works in the installed app) and dropped as soon as the organizer turns test mode off.
+// Only on this phone (kept so it also works in the installed app), and only for organizers: the app drops it
+// on any phone whose login is not an organizer's.
 const KEY = 'confra.agora'
 let offset = 0
 try {
