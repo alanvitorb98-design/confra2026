@@ -52,8 +52,9 @@ export function Viewer({ photo, onClose, canRemove, onRemove, me, canTag, guests
   }
 
   const tapPhoto = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!canTag || !live) return
+    // a tap on the photo itself never closes it: only the X or the dark area around does
     e.stopPropagation()
+    if (!canTag || !live) return
     const r = e.currentTarget.getBoundingClientRect()
     setPicking({ spot: null, at: { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height } })
   }
@@ -107,7 +108,7 @@ export function Viewer({ photo, onClose, canRemove, onRemove, me, canTag, guests
             })}
           </div>
         ) : (
-          <span className="ph" style={{ background: photo.placeholder }} />
+          <span className="ph" style={{ background: photo.placeholder }} onClick={(e) => e.stopPropagation()} />
         )}
       </motion.div>
       <div className="viewer-bar" onClick={(e) => e.stopPropagation()}>

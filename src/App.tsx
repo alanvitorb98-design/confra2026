@@ -325,7 +325,8 @@ export default function App() {
       {shot && <Develop key={shot.name + shot.lastModified} file={shot} postLabel={shootKind === 'look' ? 'Postar meu look' : 'Postar no feed'} onPost={post} onDiscard={() => setShot(null)} />}
       {open && (
         <Viewer
-          photo={open}
+          // the live copy: its links and who appears keep updating while it is open
+          photo={photos.find((p) => p.id === open.id) ?? open}
           canRemove={open.authorId === guest.id || isAdmin}
           canTag={open.kind === 'party' && (open.authorId === guest.id || isAdmin)}
           me={guest.id}
