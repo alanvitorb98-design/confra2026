@@ -170,6 +170,32 @@ async function call<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
   return data as T
 }
 
+/** A face (or a tapped point) in a photo and who it is: the face server's guess or a person's tag. */
+export interface Spot {
+  id: string
+  /** fractions of the photo; w = h = 0 for a point tapped by hand */
+  x: number
+  y: number
+  w: number
+  h: number
+  guestId: string | null
+  /** set by a person (a face marked as nobody from the app stays hidden) */
+  byHand: boolean
+}
+
+export async function loadSpots(photoId: string): Promise<Spot[]> {
+  const { data, error } = await db.from('photo_spots').select('id,x,y,w,h,guest_id,by_hand').eq('photo_id', photoId)
+  if (error) throw error
+  return (data ?? []).map((r) => ({ id: r.id, x: r.x, y: r.y, w: r.w, h: r.h, guestId: r.guest_id, byHand: r.by_hand }))
+}
+
+/** Whoever took the photo (or an organizer) says who a face is; spot null tags a new point at x, y. */
+export const tagSpot = (photoId: string, spot: string | null, guestId: string | null, at?: { x: number; y: number }) =>
+  call<string | null>('tag_spot', { p_photo: photoId, p_spot: spot, p_x: at?.x ?? null, p_y: at?.y ?? null, p_guest: guestId })
+
+/** A tagged guest takes their own tag off. */
+export const untagMe = (spot: string) => call<void>('untag_me', { p_spot: spot })
+
 export interface AdminEvent {
   app_opens: string
   party_starts: string
