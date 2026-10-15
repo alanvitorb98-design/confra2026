@@ -1,6 +1,7 @@
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { buzz } from '../lib/motion'
+import { ReactionIcon } from './Icons'
 import { REACTIONS, type Photo, type Reaction } from '../lib/types'
 import ClickSpark from './bits/ClickSpark'
 import { PolaroidFrame } from './Polaroid'
@@ -91,7 +92,7 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
                 animate={{ scale: [0.2, 1.2, 1, 1.25], opacity: [0, 1, 1, 0], rotate: [-20, 8, 0, 0], y: [0, 0, 0, -60] }}
                 transition={{ duration: 0.9, times: [0, 0.3, 0.7, 1] }}
               >
-                🔥
+                <ReactionIcon r="🔥" size={120} pop />
               </motion.span>
             )}
           </div>
@@ -217,13 +218,13 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props)
             whileTap={{ scale: 0.85 }}
           >
             <motion.span key={`${top.id}${r}${top.mine[r]}`} initial={top.mine[r] ? { scale: 1.6, rotate: -14 } : false} animate={{ scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 500, damping: 12 }}>
-              {r}
+              <ReactionIcon r={r} pop={!!top.mine[r]} />
             </motion.span>
             {top.reactions[r] > 0 && <b>{top.reactions[r]}</b>}
           </motion.button>
         ))}
       </ClickSpark>
-      <p className="feed-tip">Arrasta pro lado pra ver a próxima · toque duplo solta um 🔥</p>
+      <p className="feed-tip">Arrasta pro lado pra ver a próxima · toque duplo solta um <ReactionIcon r="🔥" size={15} /></p>
     </div>
   )
 }
