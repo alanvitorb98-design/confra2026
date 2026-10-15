@@ -78,7 +78,7 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
             {EVENT.address && <p>{EVENT.address}</p>}
             <PlaceMap />
             <div className="cd-actions">
-              {EVENT.mapsUrl && <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>}
+              {/^https:\/\//.test(EVENT.mapsUrl) && <a className="btn primary small" href={EVENT.mapsUrl} target="_blank" rel="noreferrer">Abrir no mapa</a>}
               <button className="btn ghost small" onClick={() => setPlace(false)}>Esconder</button>
             </div>
           </motion.div>
