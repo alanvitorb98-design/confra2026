@@ -62,7 +62,7 @@ export default function App() {
     }
   })
   const early = phase === 'countdown' && !!orgCode
-  const party = useParty(guest && (phase !== 'countdown' || early) ? guest : null)
+  const party = useParty(guest && (phase !== 'countdown' || early) ? guest : null, phase === 'party')
   const photos = party.photos
   const [, setConfigLoaded] = useState(0)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -241,7 +241,7 @@ export default function App() {
             }
           />
         )}
-        {tab === 'missions' && <Missions missions={party.missions} onShoot={shoot} locked={phase !== 'party'} phase={phase} />}
+        {tab === 'missions' && <Missions missions={party.missions} people={party.people} onSwap={party.swapPeople} onShoot={shoot} locked={phase !== 'party'} phase={phase} />}
         {tab === 'ranking' && <Ranking points={party.points} appearances={party.appearances} looks={bestLooks} />}
         {tab === 'me' && (
           <Profile
