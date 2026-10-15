@@ -719,3 +719,9 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
 .return-code b { display: block; margin-bottom: 4px; }
 .return-code p { margin: 0; font-size: 13px; line-height: 1.4; opacity: .8; }
 .return-code code { flex: none; padding: 8px 10px; border-radius: 10px; background: #fff; color: var(--ink); font: 700 20px ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: .12em; }
+
+/* trava de versão: só segue com a versão mais nova */
+.update-gate { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 24px; background: rgb(12 10 8 / .72); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.update-card { width: 100%; max-width: 360px; display: grid; gap: 12px; padding: 24px 20px; border-radius: 22px; background: var(--paper); color: var(--ink); text-align: center; box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
+.update-card b { font-family: var(--display); font-size: 24px; font-weight: 400; line-height: 1.15; }
+.update-card p { margin: 0; font-size: 15px; line-height: 1.45; opacity: .85; }
