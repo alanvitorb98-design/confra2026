@@ -180,3 +180,28 @@ export function CheckIcon() {
     </svg>
   )
 }
+
+/** Empty selfie slot: a little Polaroid with a face waiting, and a flash that twinkles now and then. */
+export function SelfieIcon() {
+  return (
+    <svg viewBox="0 0 58 58" aria-hidden>
+      <g transform="rotate(-6 29 30)">
+        <rect x="12" y="8" width="34" height="42" rx="2" fill="#fffdf7" stroke={ink} strokeWidth="1.7" />
+        <rect x="16" y="12" width="26" height="26" fill="#f3e3b3" stroke={ink} strokeWidth="1.3" />
+        <circle cx="29" cy="22.5" r="5" fill="none" stroke={ink} strokeWidth="1.6" />
+        <path d="M20 38c1.2-5 4.6-7.6 9-7.6s7.8 2.6 9 7.6" fill="none" stroke={ink} strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M20 44.5h10" stroke={ink} strokeWidth="1.3" strokeLinecap="round" strokeOpacity=".5" />
+      </g>
+      <motion.path
+        d="M47 5l1.4 3.6L52 10l-3.6 1.4L47 15l-1.4-3.6L42 10l3.6-1.4z"
+        fill={gold}
+        stroke={ink}
+        strokeWidth="1"
+        strokeLinejoin="round"
+        style={{ originX: 0.5, originY: 0.5 }}
+        animate={{ scale: [0.6, 1.15, 0.6], rotate: [0, 45, 90], opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+      />
+    </svg>
+  )
+}
