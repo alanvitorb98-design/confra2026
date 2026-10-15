@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { myReturnCode } from '../lib/backend'
 import type { Guest } from '../lib/types'
 import { FaceCard } from './FaceCard'
 import { VersionCard } from './VersionCard'
@@ -44,7 +45,17 @@ function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPan
   )
 }
 
+/** The código de volta: gets this account back on another phone or browser. */
+function useReturnCode() {
+  const [code, setCode] = useState<string>()
+  useEffect(() => {
+    myReturnCode().then(setCode).catch(() => undefined)
+  }, [])
+  return code
+}
+
 export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, onPanel, onClaim }: Props) {
+  const code = useReturnCode()
   return (
     <div className="page">
       <div className="profile">
@@ -61,6 +72,15 @@ export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, on
         <div><dt>Pontos</dt><dd><CountUp to={points} /></dd></div>
       </dl>
       <FaceCard guest={guest} onChange={onGuest} />
+      {code && (
+        <div className="return-code">
+          <div>
+            <b>Seu código de volta</b>
+            <p>Trocou de celular ou o navegador te deslogou? Toca em "Já me cadastrei" na entrada e digita esse código.</p>
+          </div>
+          <code>{code}</code>
+        </div>
+      )}
       {!standalone && (
         <div className="install">
           <b>Instale na tela inicial</b>
@@ -68,7 +88,12 @@ export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, on
         </div>
       )}
       <Organizer isAdmin={isAdmin} onPanel={onPanel} onClaim={onClaim} />
-      <button className="btn ghost wide" onClick={onLeave}>Sair</button>
+      <button
+        className="btn ghost wide"
+        onClick={() => confirm(code ? `Sair deste celular? Pra voltar depois, use o código ${code}.` : 'Sair deste celular?') && onLeave()}
+      >
+        Sair
+      </button>
       <VersionCard />
     </div>
   )

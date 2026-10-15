@@ -710,3 +710,12 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
   .telao-polaroid { height: auto; width: 86vw; }
   .telao-qr { display: none; }
 }
+
+/* código de volta */
+.back-link { display: block; margin: 4px auto 0; }
+.back-help { margin: 0; font-size: 15px; line-height: 1.45; }
+.back-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 24px !important; letter-spacing: .3em; text-align: center; }
+.return-code { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; border-radius: 16px; background: var(--paper-2, #f6e8bd); }
+.return-code b { display: block; margin-bottom: 4px; }
+.return-code p { margin: 0; font-size: 13px; line-height: 1.4; opacity: .8; }
+.return-code code { flex: none; padding: 8px 10px; border-radius: 10px; background: #fff; color: var(--ink); font: 700 20px ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: .12em; }
