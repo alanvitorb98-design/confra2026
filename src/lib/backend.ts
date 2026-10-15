@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
 import { stripGps } from './exif'
 import { makePreview, storageCopy } from './preview'
+import { termsAccepted } from './terms'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
 
 // Public project address and publishable key: safe in the browser, every write is checked by the database.
@@ -93,7 +94,7 @@ export class JoinError extends Error {
 /** Checks the event code on the server, which creates the guest's login. */
 export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
   const { data, error } = await db.functions.invoke('join', {
-    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn },
+    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted() },
   })
   if (error) {
     const status = (error as { context?: Response }).context?.status
