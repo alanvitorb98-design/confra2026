@@ -86,7 +86,7 @@ export function eventCode(): string {
 }
 
 export class JoinError extends Error {
-  constructor(public reason: 'code' | 'busy' | 'other') {
+  constructor(public reason: 'code' | 'busy' | 'back' | 'other') {
     super(reason)
   }
 }
@@ -109,6 +109,21 @@ export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
   }
   return { ...g, id: data.guest_id as string }
 }
+
+/** Back into an existing account on this phone with its código de volta, instead of joining again. */
+export async function comeBack(code: string): Promise<Guest> {
+  const { data, error } = await db.functions.invoke('join', { body: { back: code } })
+  if (error) {
+    const status = (error as { context?: Response }).context?.status
+    throw new JoinError(status === 404 ? 'back' : status === 429 ? 'busy' : 'other')
+  }
+  const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
+  if (sessionError) throw new JoinError('other')
+  return { id: data.guest_id as string, name: data.name as string, instagram: (data.instagram as string | null) ?? undefined, faceOptIn: !!data.face }
+}
+
+/** This guest's código de volta (made on first ask). */
+export const myReturnCode = () => call<string>('my_return_code')
 
 /** True when this phone still has a login (it can be lost if the browser clears its data). */
 export async function hasSession() {

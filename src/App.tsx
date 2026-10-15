@@ -11,7 +11,7 @@ import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
 import { TabIcon } from './components/Icons'
 import { Shutter } from './components/Shutter'
-import { amAdmin, claimAdmin, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
+import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
@@ -110,6 +110,8 @@ export default function App() {
 
   useEffect(() => {
     if (!guest) return
+    // ask the phone not to clear the app's data (and with it the login) on its own
+    navigator.storage?.persist?.().catch(() => undefined)
     try {
       // the selfie object URL dies with the page, so only the profile text is kept
       localStorage.setItem(GUEST_KEY, JSON.stringify({ ...guest, selfieUrl: undefined }))
@@ -141,6 +143,7 @@ export default function App() {
   if (!guest) return (
       <Welcome
         code={code}
+        onBack={async (c) => setGuest(await comeBack(c))}
         onEnter={async (c, g) => {
           const me = await join(c, g)
           setGuest(me)
