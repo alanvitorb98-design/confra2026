@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
 import { stripGps } from './exif'
 import * as outbox from './outbox'
+import { everyRow, photoId } from './ids'
 import { makePreview, storageCopy } from './preview'
 import { termsAccepted } from './terms'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
@@ -343,6 +344,21 @@ interface Local {
   preview: string
   status: 'sending' | 'failed' | 'sent'
   row: PhotoRow
+  /** set when trying again won't help (limit reached, file refused): the guest is told why */
+  problem?: string
+  /** the phone could not keep a copy for later: it only lives while the app stays open */
+  unsafe?: boolean
+}
+
+/** Why a photo can't go, in the guest's words, when trying again won't help; undefined for passing trouble. */
+export function lastingProblem(e: unknown): string | undefined {
+  const m = (e as { message?: string })?.message ?? String(e)
+  if (/limite de fotos/.test(m)) return 'Você chegou no limite de fotos.'
+  if (/câmera fechada|looks fechados/.test(m)) return 'A câmera já fechou.'
+  if (/too large|payload|maximum allowed size|413/i.test(m)) return 'A foto é grande demais.'
+  if (/mime|not supported|invalid_type/i.test(m)) return 'Esse formato de foto não é aceito.'
+  if (/row-level security|quota/i.test(m)) return 'Seu espaço de fotos encheu.'
+  return undefined
 }
 
 export type LiveState = 'loading' | 'live' | 'offline'
@@ -377,6 +393,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
   const signedAt = useRef(new Map<string, number>())
   const localRef = useRef(local)
   localRef.current = local
+  // photos deleted by their author while still on their way: they must never be published
+  const cancelled = useRef(new Set<string>())
   const guestsRef = useRef(guests)
   guestsRef.current = guests
 
@@ -423,7 +441,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
     }
 
     const loadFaces = async () => {
-      const { data } = await db.from('photo_faces').select('photo_id,guest_id,updated_at')
+      const { data } = await everyRow<{ photo_id: string; guest_id: string; updated_at: string }>((a, b) =>
+        db.from('photo_faces').select('photo_id,guest_id,updated_at').order('photo_id').order('guest_id').range(a, b),
+      )
       if (!alive || !data) return
       const m = new Map<string, Set<string>>()
       for (const f of data) m.set(f.photo_id, (m.get(f.photo_id) ?? new Set()).add(f.guest_id))
@@ -452,7 +472,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (what.includes('photos'))
         jobs.push(
           (async () => {
-            const { data } = await db.from('photos').select('*').gt('updated_at', since(cursor.photos))
+            // oldest change first: if more than one page changed, the cursor stops at the last row read
+            const { data } = await db.from('photos').select('*').gt('updated_at', since(cursor.photos)).order('updated_at')
             if (!alive || !data) return
             advance('photos', data.map((x) => x.updated_at))
             mergePhotos(data as PhotoRow[])
@@ -461,7 +482,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (what.includes('reactions') && cursor.reactions)
         jobs.push(
           (async () => {
-            const { data } = await db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').gt('created_at', since(cursor.reactions))
+            const { data } = await db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').gt('created_at', since(cursor.reactions)).order('created_at')
             if (!alive || !data?.length) return
             advance('reactions', data.map((x) => x.created_at))
             setReactions((m) => {
@@ -500,13 +521,16 @@ export function useParty(me: Guest | null, peopleOn = false) {
       void loadMissions()
       void loadFaces()
       void loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1))
+      // page by page: the server answers at most 1000 rows at a time, and a big party has more
       const [g, p, r] = await Promise.all([
-        db.from('guests').select('id,name'),
-        db.from('photos').select('*').is('removed_at', null).order('created_at', { ascending: false }),
-        db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').eq('active', true),
+        everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b)),
+        everyRow<PhotoRow>((a, b) => db.from('photos').select('*').is('removed_at', null).order('created_at', { ascending: false }).order('id').range(a, b)),
+        everyRow<ReactionRow>((a, b) =>
+          db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').eq('active', true).order('photo_id').order('guest_id').order('emoji').range(a, b),
+        ),
       ])
       if (!alive) return
-      if (g.error || p.error || r.error) {
+      if (!g.data || !p.data || !r.data) {
         setState('offline')
         return
       }
@@ -514,8 +538,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
       void sign((p.data as PhotoRow[]).flatMap((x) => signable(x)))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
-      // an empty table still gets a starting point, so the next look only asks for what is new
-      const start = new Date(Date.now() - 60_000).toISOString()
+      // an empty table still gets a starting point; it comes from the server's own times as soon as
+      // there are rows, never from this phone's clock alone (a clock running fast would skip changes)
+      const start = '2000-01-01T00:00:00.000Z'
       cursor.photos = start
       cursor.reactions = start
       advance('photos', (p.data as PhotoRow[]).map((x) => x.updated_at))
@@ -586,13 +611,19 @@ export function useParty(me: Guest | null, peopleOn = false) {
       file: l?.file,
       bytes: row.bytes ?? l?.file.size,
       status: l?.status === 'sent' ? undefined : l?.status,
+      problem: l?.status === 'failed' ? l.problem : undefined,
       reactions: counts.get(row.id) ?? { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
       mine: mine.get(row.id) ?? {},
       missionId: row.mission_id ?? undefined,
       faces: [...(faces.get(row.id) ?? [])].map((g) => guests.get(g) ?? 'Convidado'),
       test: row.test,
     })
-    for (const l of local.values()) all.set(l.row.id, toPhoto(rows.get(l.row.id) ?? l.row, l))
+    for (const l of local.values()) {
+      const row = rows.get(l.row.id)
+      // sent and then removed (by its author on another phone or by an organizer): gone here too
+      if (l.status === 'sent' && !row) continue
+      all.set(l.row.id, toPhoto(row ?? l.row, l))
+    }
     for (const row of rows.values()) if (!all.has(row.id)) all.set(row.id, toPhoto(row))
     // a new look hides the guest's older one right away
     const latestLook = new Map<string, Photo>()
@@ -692,6 +723,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
   const swapPeople = (id: string) => call<{ id: string }>('people_swap', { p_id: id })
 
   const hide = async (photoId: string) => {
+    // not sent yet: stop it here; a send already past the server is hidden as soon as it lands
+    cancelled.current.add(photoId)
+    void outbox.done(photoId)
     const { error } = await db.rpc('hide_photo', { p_id: photoId })
     if (error) throw error
     setRows((m) => {
@@ -760,6 +794,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       const onR2 = await toR2(row.original_path, stored, stored.type || 'image/jpeg')
       if (onR2) row = { ...row, on_r2: true }
       else await up(row.original_path, stored, stored.type || 'image/jpeg')
+      if (cancelled.current.has(row.id)) return
       const { error } = await db.rpc('send_photo', {
         p_id: row.id,
         p_kind: row.kind,
@@ -777,14 +812,21 @@ export function useParty(me: Guest | null, peopleOn = false) {
       }
       // the server has it: the phone no longer needs to hold it for a retry
       void outbox.done(row.id)
+      // deleted while this send was on its way: take it down again
+      if (cancelled.current.has(row.id)) {
+        void db.rpc('hide_photo', { p_id: row.id })
+        return
+      }
       // keep the local copy: the original stays on this phone for instant downloads
       setLocal((m) => {
         const cur = m.get(row.id)
         return cur ? new Map(m).set(row.id, { ...cur, row, status: 'sent' }) : m
       })
       setRows((m) => (m.has(row.id) ? m : new Map(m).set(row.id, { ...row, created_at: new Date().toISOString() })))
-    } catch {
-      setLocal((m) => new Map(m).set(row.id, { ...l, row, status: 'failed' }))
+    } catch (e) {
+      if (cancelled.current.has(row.id)) return
+      const problem = lastingProblem(e) ?? (l.unsafe ? 'Sem espaço no celular pra guardar: não feche o app antes de enviar.' : undefined)
+      setLocal((m) => new Map(m).set(row.id, { ...l, row, status: 'failed', problem }))
     }
   }
 
@@ -798,13 +840,12 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (!navigator.onLine || document.visibilityState !== 'visible') return
       for (const p of await outbox.waiting(me.id)) {
         if (!alive) return
-        // a week old: the party is long over
-        if (Date.now() - p.at > 7 * 86400_000) {
-          void outbox.done(p.id)
-          continue
-        }
+        // never dropped on its own: an unsent photo may be the only copy (camera photos skip the gallery)
+        if (cancelled.current.has(p.id)) continue
         const cur = localRef.current.get(p.id)
         if (cur?.status === 'sending' || cur?.status === 'sent') continue
+        // trying again won't help: it stays here, with the reason, for the guest to save on the phone
+        if (cur?.problem) continue
         const n = tries.get(p.id) ?? 0
         // after a few tries it waits for the person's own "tentar de novo"
         if (n >= 8) continue
@@ -815,13 +856,21 @@ export function useParty(me: Guest | null, peopleOn = false) {
         await send(l)
       }
     }
+    // signal back or the app back on screen: a fresh round of tries
+    const again = () => {
+      if (document.visibilityState !== 'visible') return
+      tries.clear()
+      void resend()
+    }
     void resend()
     const timer = setInterval(() => void resend(), 30_000)
-    window.addEventListener('online', resend)
+    window.addEventListener('online', again)
+    document.addEventListener('visibilitychange', again)
     return () => {
       alive = false
       clearInterval(timer)
-      window.removeEventListener('online', resend)
+      window.removeEventListener('online', again)
+      document.removeEventListener('visibilitychange', again)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id])
@@ -829,7 +878,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
   /** Posts a photo: shows it at once, uploads the preview and the untouched original, then publishes it. */
   const post = (file: File, preview: string, kind: Wall, caption: string, frame: Frame, missionId?: string) => {
     if (!me) return
-    const id = crypto.randomUUID()
+    // the id carries the moment it was taken, so a late send (no signal at the party) is still accepted
+    const id = photoId()
     const ext = (file.name.match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? file.type.split('/')[1] ?? 'jpg').toLowerCase()
     const base = `${kind}/${me.id}/${id}`
     const row: PhotoRow = {
@@ -851,8 +901,12 @@ export function useParty(me: Guest | null, peopleOn = false) {
     void fetch(preview)
       .then((r) => r.blob())
       .then((blob) => outbox.keep({ id, guest: me.id, row, file, fileName: file.name, preview: blob, at: Date.now() }))
-      .catch(() => undefined)
-      .then(() => send(l))
+      .catch(() => false)
+      .then((kept) => {
+        // the phone could not hold it (full or private mode): if this send fails, closing the app loses it
+        if (!kept) note('outbox', new Error('não guardou no celular'))
+        return send(kept ? l : { ...l, unsafe: true })
+      })
   }
 
   const retry = (id: string) => {

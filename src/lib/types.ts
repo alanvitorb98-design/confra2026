@@ -49,6 +49,8 @@ export interface Photo {
   missionId?: string
   /** Only on photos sent from this phone that have not reached the server yet */
   status?: 'sending' | 'failed'
+  /** Why a photo from this phone can't be sent, when trying again won't help */
+  problem?: string
   /** CSS background used by the example photos until the backend exists */
   placeholder?: string
   takenAt: Date

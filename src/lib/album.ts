@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate'
 import { db, readOriginal } from './backend'
+import { everyRow } from './ids'
 import { BRAND } from '../brand/brand'
 
 // "Baixar todas as fotos" in the organizer panel: every photo still in the app, full quality,
@@ -32,9 +33,10 @@ function save(files: Record<string, Uint8Array>, part: number) {
 
 /** Downloads everything; reports progress as (done, total). Returns how many photos could not be read. */
 export async function downloadAll(onProgress: (done: number, total: number) => void) {
+  // page by page: the server answers at most 1000 rows at a time, and the album must have every photo
   const [{ data: photos, error }, { data: people }] = await Promise.all([
-    db.from('photos').select('id,guest_id,kind,original_path,on_r2,created_at').is('removed_at', null).order('created_at'),
-    db.from('guests').select('id,name'),
+    everyRow<Row>((a, b) => db.from('photos').select('id,guest_id,kind,original_path,on_r2,created_at').is('removed_at', null).order('created_at').order('id').range(a, b)),
+    everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b)),
   ])
   if (error || !photos) throw new Error('não consegui listar as fotos')
   const names = new Map((people ?? []).map((g: { id: string; name: string }) => [g.id, slug(g.name)]))

@@ -13,6 +13,13 @@ export const event = {
   maps_url: null,
 }
 
+export const GUEST_ID = '10000000-0000-4000-8000-0000000000aa'
+const USER_ID = '00000000-0000-4000-8000-0000000000aa'
+const USER = { id: USER_ID, aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-10-01T00:00:00Z' }
+const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString('base64url')
+// an unsigned login token valid until 2099: the fake backend never checks signatures
+const TOKEN = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: USER_ID, role: 'authenticated', aud: 'authenticated', exp: 4102444800 })}.${Buffer.from('teste').toString('base64url')}`
+
 /**
  * Answers every Supabase call in the browser, so tests never touch production. `rpc` maps a database
  * function to its answer; anything not listed gets an empty answer. Returns the calls made, for asserts.
@@ -24,8 +31,23 @@ export async function fakeBackend(page: Page, rpc: Record<string, unknown> = {})
     const url = new URL(route.request().url())
     const fn = url.pathname.match(/\/rest\/v1\/rpc\/([\w_]+)/)?.[1]
     if (fn) {
-      calls.push({ fn, body: route.request().postDataJSON?.() ?? null })
-      return route.fulfill({ json: fn in answers ? answers[fn] : null })
+      const body = route.request().postDataJSON?.() ?? null
+      calls.push({ fn, body })
+      const answer = fn in answers ? answers[fn] : null
+      // a function as the answer decides per call; { status } answers with that HTTP error
+      const out = typeof answer === 'function' ? (answer as (b: unknown) => unknown)(body) : answer
+      if (out && typeof out === 'object' && 'status' in out) return route.fulfill({ status: (out as { status: number }).status, json: { message: 'falha simulada' } })
+      return route.fulfill({ json: out })
+    }
+    // the join function signs the guest in: a token the app accepts without checking it
+    if (url.pathname === '/functions/v1/join') {
+      calls.push({ fn: 'join', body: route.request().postDataJSON?.() ?? null })
+      return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'teste', guest_id: GUEST_ID } })
+    }
+    if (url.pathname === '/auth/v1/user') return route.fulfill({ json: USER })
+    if (url.pathname.startsWith('/storage/v1/object/')) {
+      calls.push({ fn: 'upload', body: url.pathname })
+      return route.fulfill({ json: { Key: url.pathname } })
     }
     if (url.pathname.startsWith('/rest/v1/')) return route.fulfill({ json: [] })
     if (url.pathname.startsWith('/realtime/')) return route.abort()
