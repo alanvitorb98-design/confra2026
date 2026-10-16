@@ -250,7 +250,14 @@ export interface AdminEvent {
   lat: number | null
   lng: number | null
   test_mode: boolean
+  /** missions with people: on, the biggest group drawn, and how many guests the party needs before they start */
+  gen_missions: boolean
+  gen_max_people: number
+  gen_min_guests: number
 }
+
+/** points of a mission with people by group size (the server's people_points) */
+export const PEOPLE_POINTS = [10, 25, 45, 70, 100, 135]
 
 export const admin = {
   event: async () => {

@@ -1,6 +1,6 @@
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
-import { admin, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
+import { admin, PEOPLE_POINTS, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
 import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
 import { BRAND } from '../brand/brand'
@@ -42,7 +42,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
   const [msg, setMsg] = useState<string>()
   const [busy, setBusy] = useState(false)
   const [draft, setDraft] = useState<Record<string, { title: string; points: number; active: boolean; target: string }>>({})
-  const [adding, setAdding] = useState({ title: '', points: 30, target: '' })
+  const [adding, setAdding] = useState({ title: '', points: 15, target: '' })
   const [faceStats, setFaceStats] = useState<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>()
   const [faceSecret, setFaceSecret] = useState<string>()
   const [r2, setR2] = useState<boolean>()
@@ -162,8 +162,40 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
         </section>
       )}
 
+      {ev && (
+        <section className="panel admin-section">
+          <h3>Missões com pessoas</h3>
+          <p className="page-note">O app sorteia convidados pra cada um sair na foto e confere pelo rosto. Começa com 1 pessoa e aumenta 1 a cada 2 cumpridas. Cada convidado pode trocar as pessoas 3 vezes.</p>
+          <label className="admin-mini">
+            <input type="checkbox" checked={ev.gen_missions} onChange={(e) => set('gen_missions', e.target.checked)} /> Ligadas
+          </label>
+          <label className="field">
+            <span>Até quantas pessoas por foto</span>
+            <select value={ev.gen_max_people} onChange={(e) => set('gen_max_people', Number(e.target.value))}>
+              {PEOPLE_POINTS.map((_, i) => (
+                <option key={i} value={i + 1}>{i + 1} {i ? 'pessoas' : 'pessoa'}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Começam quando a festa tiver quantos convidados</span>
+            <input type="number" min={2} max={500} value={ev.gen_min_guests} onChange={(e) => set('gen_min_guests', Number(e.target.value))} />
+          </label>
+          <p className="page-note">
+            Pontos: {PEOPLE_POINTS.slice(0, ev.gen_max_people).map((pts, i) => `${i + 1} ${i ? 'pessoas' : 'pessoa'} ${pts}`).join(' · ')}
+          </p>
+          <button
+            className="btn primary small"
+            disabled={busy}
+            onClick={() => run(() => admin.saveEvent({ gen_missions: ev.gen_missions, gen_max_people: ev.gen_max_people, gen_min_guests: ev.gen_min_guests }), 'Missões com pessoas salvas.')}
+          >
+            Salvar
+          </button>
+        </section>
+      )}
+
       <section className="panel admin-section">
-        <h3>Missões</h3>
+        <h3>Missões extras</h3>
         <ul className="admin-missions">
           {missions.map((m) => {
             const d = row(m)
@@ -189,13 +221,13 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
             <button
               className="btn primary small"
               disabled={busy || adding.title.trim().length < 3}
-              onClick={() => run(async () => { await admin.saveMission({ ...adding, active: true, sort: missions.length + 1 }); setAdding({ title: '', points: 30, target: '' }) }, 'Missão criada.')}
+              onClick={() => run(async () => { await admin.saveMission({ ...adding, active: true, sort: missions.length + 1 }); setAdding({ title: '', points: 15, target: '' }) }, 'Missão criada.')}
             >
               Criar
             </button>
           </li>
         </ul>
-        <p className="page-note">O número é quanto a missão vale. Se preencher quem tem que aparecer, a missão só conta quando o reconhecimento achar o rosto dessa pessoa na foto (o nome não precisa ser exato, e a pessoa precisa ter cadastrado a selfie). Missão desativada some pra quem ainda não fez. Os pontos de quem já fez continuam.</p>
+        <p className="page-note">Missões que você escreve, pra brincadeiras da festa (pista de dança, brinde, look). Valem 15 por padrão, menos que as com pessoas, porque sem "quem tem que aparecer" qualquer foto cumpre. O número é quanto a missão vale. Se preencher quem tem que aparecer, a missão só conta quando o reconhecimento achar o rosto dessa pessoa na foto (o nome não precisa ser exato, e a pessoa precisa ter cadastrado a selfie). Missão desativada some pra quem ainda não fez. Os pontos de quem já fez continuam.</p>
       </section>
 
       <section className="panel admin-section">

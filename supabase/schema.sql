@@ -112,7 +112,7 @@ create table public.live_dirty (
 create table public.missions (
   id uuid default gen_random_uuid() not null,
   title text not null,
-  points integer default 20 not null,
+  points integer default 15 not null,
   active boolean default true not null,
   sort integer default 0 not null,
   created_at timestamp with time zone default now() not null,
@@ -523,6 +523,9 @@ begin
     lat = case when p ? 'lat' then (p->>'lat')::double precision else lat end,
     lng = case when p ? 'lng' then (p->>'lng')::double precision else lng end,
     test_mode = coalesce((p->>'test_mode')::boolean, test_mode),
+    gen_missions = coalesce((p->>'gen_missions')::boolean, gen_missions),
+    gen_max_people = coalesce(least(greatest((p->>'gen_max_people')::int, 1), 6), gen_max_people),
+    gen_min_guests = coalesce(least(greatest((p->>'gen_min_guests')::int, 2), 500), gen_min_guests),
     updated_at = now()
   where id;
 end $function$
