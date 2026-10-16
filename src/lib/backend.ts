@@ -169,6 +169,14 @@ export async function sendSelfie(guestId: string, selfie: Blob) {
 
 export const faceOptOut = () => db.rpc('face_opt_out')
 
+export type FaceProgress = { status: 'none' | 'pending' | 'ready' | 'failed'; reading: boolean; worker: boolean; ahead: number }
+
+/** Where my selfie's analysis is: server on, selfie being read, selfies ahead of mine. */
+export async function myFaceProgress(): Promise<FaceProgress | null> {
+  const { data, error } = await db.rpc('my_face_progress')
+  return error || !data ? null : (data as FaceProgress)
+}
+
 export async function myFaceStatus(guestId: string) {
   const { data } = await db.from('guests').select('face_status').eq('id', guestId).single()
   return (data?.face_status ?? 'none') as 'none' | 'pending' | 'ready' | 'failed'
