@@ -1,9 +1,9 @@
 name: Face worker
 
 # Runs the face model (InsightFace, face-space/app.py) on GitHub's machines, free for public repos.
-# Started by the app's database (pg_cron + the rostos-cron function), because GitHub's own schedule runs
-# late or skips: short runs that clear the queue every 30 minutes from 06/11 20h, and on the party day two
-# long runs covering 9h50 to about 21h30 Brasília, so photos are matched within seconds.
+# Started by the app's database (rostos_chamar + the rostos-cron function) only when a selfie or photo is
+# waiting: a short run clears the queue and stops a few minutes after it empties. On the party day two long
+# runs cover 9h50 to about 21h30 Brasília, so photos are matched within seconds.
 # Needs the FACE_SECRET repository secret, generated in the app's organizer panel.
 on:
   workflow_dispatch:
@@ -19,10 +19,10 @@ concurrency:
 jobs:
   work:
     runs-on: ubuntu-latest
-    # long runs (the party) get two servers side by side; the queue gives each photo to only one of them
+    # long runs (the party) get four servers side by side; the queue gives each photo to only one of them
     strategy:
       matrix:
-        worker: ${{ fromJSON((inputs.minutes != '' && inputs.minutes != '0') && '[1, 2]' || '[1]') }}
+        worker: ${{ fromJSON((inputs.minutes != '' && inputs.minutes != '0') && '[1, 2, 3, 4]' || '[1]') }}
     timeout-minutes: 355
     env:
       FACE_SECRET: ${{ secrets.FACE_SECRET }}

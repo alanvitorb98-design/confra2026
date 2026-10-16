@@ -3,6 +3,7 @@ once from a 5-minute link, and sends back only face signatures (512 numbers per 
 in memory only and never written to disk.
 
 It runs on GitHub Actions (`.github/workflows/faces-worker.yml`), which is free for this public repo:
-every 30 minutes it clears the queue, and on the party day it runs non-stop. Needs the `FACE_SECRET`
+the app's database starts it only when a selfie or photo is waiting, and it stops a few minutes after
+the queue empties; on the party day four of them run non-stop. Needs the `FACE_SECRET`
 repository secret (generated in the app's organizer panel). The Dockerfile is there for running it on
 any machine with Docker instead.
