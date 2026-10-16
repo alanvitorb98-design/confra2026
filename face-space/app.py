@@ -5,7 +5,7 @@ with InsightFace (buffalo_l: RetinaFace detection + ArcFace recognition) and sen
 512-number signatures. Images live only in memory.
 
 Runs on GitHub Actions (workflow "Face worker"): with RUN_MINUTES it works for that long and exits, and
-with DRAIN=1 it exits as soon as the queue is empty. Without either it runs forever with a tiny health
+with DRAIN=1 it exits a few minutes after the queue empties. Without either it runs forever with a tiny health
 server on port 7860 (for Docker hosting).
 """
 
@@ -182,6 +182,9 @@ class Health(BaseHTTPRequestHandler):
         pass
 
 
+LINGER = 180  # seconds
+
+
 def run_for(minutes, drain):
     """GitHub Actions mode: work until the time is up (or the queue is empty with drain), then exit."""
     if not SECRET:
@@ -189,16 +192,18 @@ def run_for(minutes, drain):
         raise SystemExit(1)
     load_model()
     end = time.time() + minutes * 60
-    idle, empty = 3, 0
+    idle, last_work = 3, time.time()
     while time.time() < end:
         try:
             n = work_once()
-            empty = 0 if n else empty + 1
+            if n:
+                last_work = time.time()
             idle = 3 if n else min(idle * 2, 20)
         except Exception as e:
             print("queue:", type(e).__name__, flush=True)
             idle = 30
-        if drain and empty >= 2:
+        # drain: stay a few minutes after the queue empties, so photos sent right after are read at once
+        if drain and time.time() - last_work > LINGER:
             break
         time.sleep(idle)
     print(f"done: {status['done']} photos, {status['errors']} errors", flush=True)
