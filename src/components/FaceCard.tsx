@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { faceOptOut, myFaceProgress, myFaceStatus, sendSelfie, type FaceProgress } from '../lib/backend'
+import { progressOf } from '../lib/faceProgress'
 import type { Guest } from '../lib/types'
 import { SelfieCam } from './SelfieCam'
 
@@ -10,20 +11,6 @@ const TEXT: Record<Status, string> = {
   pending: 'Analisando sua selfie… pode levar um minutinho.',
   ready: 'Ligado! O app já procura você nas fotos da festa.',
   failed: 'Não achei um rosto nessa selfie. Tenta outra, de frente e com luz.',
-}
-
-// The face server takes about a minute to start when it is off (about 53 s measured), then a few seconds per selfie.
-const BOOT_S = 35
-
-/** Percent and label for the bar: sending, starting the server (estimated by time), in line, reading, done. */
-function progressOf(sending: boolean, p: FaceProgress | undefined, since: number, now: number) {
-  const t = Math.max(0, (now - since) / 1000)
-  if (sending) return { pct: Math.min(18, 4 + t * 6), label: 'Enviando a selfie…' }
-  if (!p || p.status !== 'pending') return null
-  if (p.reading) return { pct: 92, label: 'Lendo seu rosto…' }
-  if (p.worker && p.ahead > 0) return { pct: 84, label: p.ahead === 1 ? '1 selfie na sua frente…' : `${p.ahead} selfies na sua frente…` }
-  if (p.worker) return { pct: 86, label: 'Quase lá…' }
-  return { pct: 20 + 60 * (1 - Math.exp(-t / BOOT_S)), label: 'Ligando o reconhecimento…' }
 }
 
 /** Face matching on the profile: turn it on with a selfie, or off (which wipes the signature and matches). */
