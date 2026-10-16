@@ -524,8 +524,9 @@ begin
     lng = case when p ? 'lng' then (p->>'lng')::double precision else lng end,
     test_mode = coalesce((p->>'test_mode')::boolean, test_mode),
     gen_missions = coalesce((p->>'gen_missions')::boolean, gen_missions),
-    gen_max_people = coalesce(least(greatest((p->>'gen_max_people')::int, 1), 6), gen_max_people),
-    gen_min_guests = coalesce(least(greatest((p->>'gen_min_guests')::int, 2), 500), gen_min_guests),
+    -- greatest/least skip nulls, so a missing field must keep the old value explicitly
+    gen_max_people = case when p ? 'gen_max_people' then least(greatest((p->>'gen_max_people')::int, 1), 6) else gen_max_people end,
+    gen_min_guests = case when p ? 'gen_min_guests' then least(greatest((p->>'gen_min_guests')::int, 2), 500) else gen_min_guests end,
     updated_at = now()
   where id;
 end $function$
