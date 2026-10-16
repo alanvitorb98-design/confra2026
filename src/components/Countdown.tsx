@@ -4,7 +4,8 @@ import { APP_OPENS, EVENT, clock, day, split, useNow } from '../lib/event'
 import { Reminders } from './Reminders'
 import { PlaceMap } from './PlaceMap'
 import { Logo } from './Logo'
-import { PartyScene } from './PartyScene'
+import { PartyScene } from '../brand/PartyScene'
+import { BRAND } from '../brand/brand'
 
 function Unit({ value, label }: { value: number; label: string }) {
   const text = String(value).padStart(2, '0')
@@ -42,7 +43,7 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
       <PartyScene variant="ambient" />
       <div className="logo-block">
         <Logo />
-        <p className="logo-sub">Equipe Derhu</p>
+        <p className="logo-sub">{BRAND.subtitle}</p>
       </div>
 
       <div className="cd-card">

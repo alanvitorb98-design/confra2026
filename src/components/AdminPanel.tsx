@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { admin, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
 import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
+import { BRAND } from '../brand/brand'
 
 const APP_URL = `${location.origin}${import.meta.env.BASE_URL}`
 
@@ -19,8 +20,8 @@ const fromLocal = (v: string) => new Date(`${v}:00-03:00`).toISOString()
 
 const TIMES: { key: keyof AdminEvent; label: string }[] = [
   { key: 'app_opens', label: 'App abre (cadastro)' },
-  { key: 'look_opens', label: 'Look da Confra abre' },
-  { key: 'look_closes', label: 'Look da Confra fecha' },
+  { key: 'look_opens', label: `${BRAND.lookName} abre` },
+  { key: 'look_closes', label: `${BRAND.lookName} fecha` },
   { key: 'party_starts', label: 'Festa começa' },
   { key: 'party_ends', label: 'Festa termina' },
 ]
@@ -57,7 +58,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
 
   useEffect(() => {
     if (!link) return
-    QRCode.toDataURL(link, { width: 720, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#1d1a16', light: '#fffdf7' } }).then(setQr)
+    QRCode.toDataURL(link, { width: 720, margin: 2, errorCorrectionLevel: 'M', color: { dark: BRAND.colors.ink, light: '#fffdf7' } }).then(setQr)
   }, [link])
 
   const run = async (job: () => Promise<unknown>, ok: string) => {
@@ -89,7 +90,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
     if (!qr) return
     const a = document.createElement('a')
     a.href = qr
-    a.download = 'qr-confra-da-firma.png'
+    a.download = BRAND.qrFile
     a.click()
   }
 

@@ -1,5 +1,6 @@
 import { animate, motion, useMotionValue, useTransform, type MotionValue } from 'motion/react'
 import { useEffect } from 'react'
+import { BRAND } from '../brand/brand'
 
 const N = 6
 const R = 30 // inner radius of the barrel, in viewBox units (viewBox is 64x64, centre 32,32)
@@ -74,7 +75,7 @@ export function Shutter({ disabled, label, onShoot }: { disabled: boolean; label
         <defs>
           <radialGradient id="lens-glass" cx="38%" cy="34%" r="70%">
             <stop offset="0" stopColor="#6d5f4c" />
-            <stop offset=".35" stopColor="#2a241c" />
+            <stop offset=".35" stopColor={BRAND.colors.inkWarm} />
             <stop offset="1" stopColor="#050403" />
           </radialGradient>
           <linearGradient id="blade-metal" x1="0" y1="0" x2="1" y2="1">

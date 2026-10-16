@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { storageKey } from '../brand/brand'
 
-const KEY = 'confra.darkhint'
+const KEY = storageKey('darkhint')
 
 // Samsung Internet's dark mode repaints every site dark and ignores color-scheme, so the app can't opt out.
 // When it is likely on, tell the guest how to get the invite colors back.

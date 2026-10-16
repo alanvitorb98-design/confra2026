@@ -22,12 +22,13 @@ import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
 import { Splash } from './components/Splash'
 import { Logo } from './components/Logo'
-import { PartyScene } from './components/PartyScene'
+import { PartyScene } from './brand/PartyScene'
+import { BRAND, storageKey } from './brand/brand'
 
 type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
-const GUEST_KEY = 'confra26.guest'
-const ORG_KEY = 'confra26.org'
+const GUEST_KEY = storageKey('guest')
+const ORG_KEY = storageKey('org')
 
 function loadGuest(): Guest | null {
   try {
@@ -205,7 +206,7 @@ export default function App() {
       : party.state === 'offline'
         ? 'Sem conexão agora. As fotos aparecem assim que a internet voltar.'
         : phase === 'warmup'
-      ? 'O Look da Confra abre no dia da festa, às 7h. Já vai separando a roupa!'
+      ? BRAND.lookSoon
       : phase === 'look'
         ? 'Ninguém postou o look ainda. Toca no botão e seja a primeira pessoa!'
         : showWall === 'look'

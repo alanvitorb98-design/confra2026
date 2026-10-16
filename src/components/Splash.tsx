@@ -1,11 +1,12 @@
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import { Logo } from './Logo'
-import { PartyScene } from './PartyScene'
+import { PartyScene } from '../brand/PartyScene'
 import { termsAccepted } from '../lib/terms'
 import { Terms } from './Terms'
+import { BRAND } from '../brand/brand'
 
-/** Opening shot: fireworks pop around the invitation title, glasses slide in. Tap the button to go in. */
+/** Opening shot: the event's title over its scene (src/brand/PartyScene). Tap the button to go in. */
 export function Splash({ onDone }: { onDone: () => void }) {
   const [terms, setTerms] = useState(false)
   return (
@@ -19,9 +20,9 @@ export function Splash({ onDone }: { onDone: () => void }) {
         transition={{ delay: 0.9, duration: 0.9, ease: [0.2, 0.8, 0.2, 1] }}
       >
         <Logo />
-        <p className="splash-team">Equipe Derhu</p>
-        <p className="splash-question">Preparado para a confraternização?</p>
-        <p className="splash-date">07/11</p>
+        <p className="splash-team">{BRAND.subtitle}</p>
+        <p className="splash-question">{BRAND.question}</p>
+        <p className="splash-date">{BRAND.dateLabel}</p>
       </motion.div>
 
       <motion.button
@@ -32,7 +33,7 @@ export function Splash({ onDone }: { onDone: () => void }) {
         transition={{ delay: 1.7, type: 'spring', stiffness: 260, damping: 16 }}
         whileTap={{ scale: 0.94 }}
       >
-        Bora!
+        {BRAND.enter}
       </motion.button>
       {terms && <Terms onAccept={onDone} />}
     </motion.div>

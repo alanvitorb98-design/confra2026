@@ -1,10 +1,11 @@
 import { readOriginal } from './backend'
 import type { Photo } from './types'
+import { BRAND } from '../brand/brand'
 
 function fileName(photo: Photo, source: string) {
   const ext = /\.[a-z0-9]{2,5}$/i.exec(source)?.[0] ?? '.jpg'
   const stamp = photo.takenAt.toISOString().slice(0, 16).replace(/[-:T]/g, '')
-  return `confra26-${photo.author.toLowerCase().replace(/\s+/g, '-')}-${stamp}${ext}`
+  return `${BRAND.slug}-${photo.author.toLowerCase().replace(/\s+/g, '-')}-${stamp}${ext}`
 }
 
 /**

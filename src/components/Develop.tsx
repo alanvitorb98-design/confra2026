@@ -5,6 +5,7 @@ import { FRAMES, type Frame } from '../lib/types'
 import { frameClass } from '../lib/frame'
 import { makePreview } from '../lib/preview'
 import { shareOrDownload } from '../lib/download'
+import { BRAND } from '../brand/brand'
 
 interface Props {
   file: File
@@ -169,7 +170,7 @@ export function Develop({ file, onPost, onDiscard, postLabel }: Props) {
             </div>
             <button className="btn ghost" onClick={onDiscard}>Descartar</button>
             {/* keeps the photo on this phone only: nothing goes to the server */}
-            <button className="btn ghost" onClick={() => void shareOrDownload(new File([file], `confra26-${Date.now()}${/\.[a-z0-9]{2,5}$/i.exec(file.name)?.[0] ?? '.jpg'}`, { type: file.type || 'image/jpeg' })).then((r) => r !== 'cancelled' && setSaved(true))}>
+            <button className="btn ghost" onClick={() => void shareOrDownload(new File([file], `${BRAND.slug}-${Date.now()}${/\.[a-z0-9]{2,5}$/i.exec(file.name)?.[0] ?? '.jpg'}`, { type: file.type || 'image/jpeg' })).then((r) => r !== 'cancelled' && setSaved(true))}>
               {saved ? 'Salva ✓' : 'Salvar no celular'}
             </button>
             <button className="btn primary" onClick={() => {

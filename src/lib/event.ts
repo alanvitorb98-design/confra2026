@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { storageKey } from '../brand/brand'
 
 // Everything about the party date. The organizer edits it in the admin panel; these are the
 // defaults until the server answers (and the last answer is cached on the phone). Times are Brasília (-03:00).
@@ -34,7 +35,7 @@ export interface EventConfig {
   lng?: number | null
 }
 
-const CONFIG_KEY = 'confra26.event'
+const CONFIG_KEY = storageKey('event')
 
 export function applyConfig(c: EventConfig, cache = true) {
   const date = (v: string, fallback: Date) => (Number.isNaN(Date.parse(v)) ? fallback : new Date(v))
@@ -81,7 +82,7 @@ export function phaseAt(now: number): Phase {
 // Test clock: open the app with ?agora=2026-11-07T08:00 to see any phase, ?agora=off to go back.
 // Only on this phone (kept so it also works in the installed app), and only for organizers: the app drops it
 // on any phone whose login is not an organizer's.
-const KEY = 'confra.agora'
+const KEY = storageKey('agora')
 let offset = 0
 try {
   const q = new URLSearchParams(location.search).get('agora')
