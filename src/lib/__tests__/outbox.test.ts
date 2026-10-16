@@ -14,7 +14,7 @@ const photo = (id: string, guest = 'g1'): Pending => ({
 
 describe('photos waiting to be sent', () => {
   it('keeps a photo until the server confirms it', async () => {
-    await keep(photo('a'))
+    expect(await keep(photo('a'))).toBe(true)
     expect((await waiting('g1')).map((p) => p.id)).toEqual(['a'])
     await done('a')
     expect(await waiting('g1')).toEqual([])

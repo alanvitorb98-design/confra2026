@@ -1,7 +1,7 @@
 /**
  * Photos on their way to the server, kept on this phone (IndexedDB) until the server confirms them.
  * Closing the app, losing signal or a reload never loses a photo: the next time the app opens it sends
- * what is still here. If the browser has no IndexedDB (rare private modes) it quietly keeps nothing.
+ * what is still here. If the browser has no IndexedDB (rare private modes) or no space, keep() says so.
  */
 const NAME = 'fotos-a-enviar'
 const STORE = 'fotos'
@@ -39,16 +39,19 @@ async function run<T>(mode: IDBTransactionMode, work: (s: IDBObjectStore) => IDB
   if (!db) return null
   return new Promise((resolve) => {
     try {
-      const req = work(db.transaction(STORE, mode).objectStore(STORE))
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => resolve(null)
+      const tx = db.transaction(STORE, mode)
+      const req = work(tx.objectStore(STORE))
+      // a write only counts once the transaction is on disk (a full phone aborts it at commit)
+      tx.oncomplete = () => resolve(req.result ?? null)
+      tx.onabort = tx.onerror = () => resolve(null)
     } catch {
       resolve(null)
     }
   })
 }
 
-export const keep = (p: Pending) => run('readwrite', (s) => s.put(p)).then(() => undefined)
+/** Keeps a photo on this phone; false when it could not be stored (no space, no IndexedDB). */
+export const keep = (p: Pending) => run('readwrite', (s) => s.put(p)).then((key) => key !== null)
 
 export const done = (id: string) => run('readwrite', (s) => s.delete(id)).then(() => undefined)
 

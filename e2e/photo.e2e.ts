@@ -1,0 +1,84 @@
+import { expect, test, type Page } from '@playwright/test'
+import { fakeBackend } from './backend'
+
+// the photo's whole way: sign up during the party, take it, reveal it, post it
+const DURING = new Date('2026-11-07T11:00:00-03:00')
+
+/** A small JPEG drawn in the browser, as the camera would hand it over. */
+async function cameraPhoto(page: Page) {
+  const data = await page.evaluate(() => {
+    const c = document.createElement('canvas')
+    c.width = 800
+    c.height = 600
+    const g = c.getContext('2d')!
+    g.fillStyle = '#c84'
+    g.fillRect(0, 0, 800, 600)
+    g.fillStyle = '#248'
+    g.fillRect(200, 150, 400, 300)
+    return c.toDataURL('image/jpeg', 0.9).split(',')[1]
+  })
+  return { name: 'IMG_0001.jpg', mimeType: 'image/jpeg', buffer: Buffer.from(data, 'base64') }
+}
+
+async function signUp(page: Page) {
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
+  await page.locator('.splash-go').click()
+  const terms = page.getByRole('dialog', { name: 'Combinados da festa' })
+  await terms.getByLabel('Li e topo os combinados').check()
+  await terms.getByRole('button', { name: 'Entrar' }).click()
+  await page.getByLabel('Seu nome').fill('Ana Teste')
+  await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
+  await page.getByRole('button', { name: 'Entrar na festa' }).click()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+}
+
+/** Picks a photo as if from the camera, holds it until it develops and posts it. */
+async function takeAndPost(page: Page) {
+  await page.locator('#camera').setInputFiles(await cameraPhoto(page))
+  const print = page.locator('.develop-polaroid')
+  await expect(print.locator('img.develop-sharp')).toBeVisible({ timeout: 10_000 })
+  await expect(page.locator('.develop.stage-develop')).toBeVisible({ timeout: 10_000 })
+  const box = (await print.boundingBox())!
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  await expect(page.getByText('Revelou!')).toBeVisible({ timeout: 10_000 })
+  await page.mouse.up()
+  await page.getByRole('button', { name: 'Postar no feed' }).click()
+}
+
+test('a photo taken during the party is uploaded and published once', async ({ page }) => {
+  const calls = await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  await takeAndPost(page)
+  await expect.poll(() => calls.filter((c) => c.fn === 'send_photo').length, { timeout: 15_000 }).toBe(1)
+  const sent = calls.find((c) => c.fn === 'send_photo')!.body as { p_original: string; p_preview: string; p_kind: string }
+  expect(sent.p_kind).toBe('party')
+  // the original, the 1080px copy and the thumbnail all went up before the photo was published
+  const uploads = calls.filter((c) => c.fn === 'upload').map((c) => c.body as string)
+  expect(uploads.some((u) => u.endsWith(sent.p_original))).toBe(true)
+  expect(uploads.some((u) => u.endsWith(sent.p_preview))).toBe(true)
+  expect(uploads.some((u) => u.endsWith(sent.p_preview.replace(/-p\.jpg$/, '-t.jpg')))).toBe(true)
+})
+
+test('a photo that fails to publish stays on the phone and goes out after the app reopens', async ({ page }) => {
+  let fail = true
+  const calls = await fakeBackend(page, { send_photo: () => (fail ? { status: 500 } : null) })
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  await takeAndPost(page)
+  await expect.poll(() => calls.filter((c) => c.fn === 'send_photo').length, { timeout: 15_000 }).toBeGreaterThan(0)
+  const id = (calls.find((c) => c.fn === 'send_photo')!.body as { p_id: string }).p_id
+  // the server is back; the guest closes and opens the app
+  fail = false
+  await page.reload()
+  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
+  await page.locator('.splash-go').click()
+  await expect
+    .poll(() => calls.filter((c) => c.fn === 'send_photo' && (c.body as { p_id: string }).p_id === id).length, { timeout: 20_000 })
+    .toBeGreaterThan(1)
+  // the same photo id both times: the server keeps one copy
+  const ids = new Set(calls.filter((c) => c.fn === 'send_photo').map((c) => (c.body as { p_id: string }).p_id))
+  expect(ids.size).toBe(1)
+})

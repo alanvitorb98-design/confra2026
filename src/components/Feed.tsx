@@ -198,7 +198,9 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props)
 
       <div className="feed-meta">
         {top.status === 'failed' ? (
-          <button className="feed-status failed" onClick={() => onRetry?.(top.id)}>Não foi. Tocar pra reenviar</button>
+          <button className="feed-status failed" onClick={() => onRetry?.(top.id)}>
+            {top.problem ? `Não foi: ${top.problem} A foto segue guardada aqui. Toca pra tentar de novo.` : 'Não foi. Tocar pra reenviar'}
+          </button>
         ) : top.status === 'sending' ? (
           <span className="feed-status">Enviando…</span>
         ) : (
