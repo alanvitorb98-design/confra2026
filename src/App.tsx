@@ -198,7 +198,7 @@ export default function App() {
   const total = (p: Photo) => Object.values(p.reactions).reduce((a, b) => a + b, 0)
   const bestLooks = photos
     .filter((p) => p.kind === 'look')
-    .map((p) => ({ name: p.author, value: total(p) }))
+    .map((p) => ({ id: p.authorId ?? p.id, name: p.author, value: total(p) }))
     .sort((a, b) => b.value - a.value)
   const empty =
     party.state === 'loading'
@@ -264,7 +264,7 @@ export default function App() {
               return ok
             }}
             myPhotos={myPhotos}
-            points={party.points.find((e) => e.name === guest.name)?.value ?? 0}
+            points={party.points.find((e) => e.id === guest.id)?.value ?? 0}
             onLeave={() => {
               try { localStorage.removeItem(GUEST_KEY) } catch { /* ignore */ }
               void leave()

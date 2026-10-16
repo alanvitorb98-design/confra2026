@@ -74,6 +74,8 @@ export interface Mission {
 }
 
 export interface RankEntry {
+  /** the guest's id: two guests can share a name */
+  id: string
   name: string
   value: number
 }
