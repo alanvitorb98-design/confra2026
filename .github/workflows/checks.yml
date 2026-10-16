@@ -33,3 +33,28 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
+
+  banco:
+    # The database tests: a local Supabase built from supabase/schema.sql, then supabase/tests/*.sql in order.
+    # Nothing here touches the real project.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Start a local Supabase
+        run: |
+          # supabase/migrations only holds recent changes, not the whole database: the snapshot below is loaded instead
+          mv supabase/migrations "$RUNNER_TEMP/migrations"
+          supabase init --force >/dev/null
+          supabase start -x studio,imgproxy,mailpit,logflare,vector,edge-runtime,supavisor,postgres-meta
+      - name: Load the database
+        run: psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f supabase/schema.sql
+      - name: Run the database tests
+        run: |
+          for f in supabase/tests/*.sql; do
+            echo "== $f"
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
