@@ -58,15 +58,16 @@ async function r2Link(op: 'put' | 'get', path: string) {
   return (await res.json()) as { url?: string; exists?: boolean }
 }
 
-/** Upload links for several files of one photo in a single call (original, 1080px copy, thumbnail) */
-async function r2Many(paths: string[]) {
+/** Upload links for several files of one photo in a single call (original, 1080px copy, thumbnail); each link
+ * only takes that exact size and type */
+async function r2Many(files: { path: string; size: number; type: string }[]) {
   const { data } = await db.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error('sem login')
   const res = await fetch(`${R2_FN}?op=put-many`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, apikey: KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ paths }),
+    body: JSON.stringify({ files }),
   })
   if (!res.ok) throw new Error(`r2 ${res.status}`)
   return ((await res.json()) as { paths: Record<string, { url?: string; exists?: boolean }> }).paths
@@ -774,7 +775,14 @@ export function useParty(me: Guest | null, peopleOn = false) {
       // else to the app's bucket; the original goes to R2 too and falls back to the bucket on its own
       const thumbPath = row.preview_path.replace(/-p\.jpg$/, '-t.jpg')
       const thumbBlob = await lightCopy(previewBlob, 480, 0.72)
-      const r2Put = (await r2On()) ? await r2Many([row.original_path, row.preview_path, thumbPath]).catch((e) => (note('r2', e), null)) : null
+      const storedType = stored.type || 'image/jpeg'
+      const r2Put = (await r2On())
+        ? await r2Many([
+            { path: row.original_path, size: stored.size, type: storedType },
+            { path: row.preview_path, size: previewBlob.size, type: 'image/jpeg' },
+            { path: thumbPath, size: thumbBlob.size, type: 'image/jpeg' },
+          ]).catch((e) => (note('r2', e), null))
+        : null
       const toR2 = async (path: string, body: Blob, type: string) => {
         const link = r2Put?.[path]
         if (!link) return false
@@ -791,9 +799,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
       // party photos also get a 1600px copy for the face server, deleted after it is read
       if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
       // the database notices the original isn't in its bucket
-      const onR2 = await toR2(row.original_path, stored, stored.type || 'image/jpeg')
+      const onR2 = await toR2(row.original_path, stored, storedType)
       if (onR2) row = { ...row, on_r2: true }
-      else await up(row.original_path, stored, stored.type || 'image/jpeg')
+      else await up(row.original_path, stored, storedType)
       if (cancelled.current.has(row.id)) return
       const { error } = await db.rpc('send_photo', {
         p_id: row.id,
