@@ -1,4 +1,5 @@
 import type { Photo } from './types'
+import { BRAND } from '../brand/brand'
 
 const W = 1080
 const H = 1920
@@ -17,8 +18,8 @@ function loadImage(src: string) {
 function burst(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, rays: number) {
   ctx.save()
   ctx.translate(x, y)
-  ctx.strokeStyle = '#d9a52b'
-  ctx.fillStyle = '#f6d77c'
+  ctx.strokeStyle = BRAND.colors.gold
+  ctx.fillStyle = BRAND.colors.goldHi
   ctx.lineCap = 'round'
   ctx.lineWidth = r * 0.05
   for (let i = 0; i < rays; i++) {
@@ -43,8 +44,8 @@ function burst(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, r
 function drawBackdrop(ctx: CanvasRenderingContext2D) {
   const paper = ctx.createLinearGradient(0, 0, 0, H)
   paper.addColorStop(0, '#fcf5de')
-  paper.addColorStop(0.5, '#fbf3d9')
-  paper.addColorStop(1, '#f6e8bd')
+  paper.addColorStop(0.5, BRAND.colors.paper)
+  paper.addColorStop(1, BRAND.colors.paper2)
   ctx.fillStyle = paper
   ctx.fillRect(0, 0, W, H)
 
@@ -60,7 +61,7 @@ function drawBackdrop(ctx: CanvasRenderingContext2D) {
   ]
   for (const [x, y, r, pale] of dots) {
     const g = ctx.createRadialGradient(x - r * 0.3, y - r * 0.4, 1, x, y, r)
-    g.addColorStop(0, pale ? '#f8e6ad' : '#fbe7a4')
+    g.addColorStop(0, pale ? '#f8e6ad' : BRAND.colors.foilHi)
     g.addColorStop(1, pale ? '#f0d68a' : '#c4911a')
     ctx.fillStyle = g
     ctx.beginPath()
@@ -80,11 +81,11 @@ export async function makeStory(photo: Photo): Promise<File> {
 
   // invitation title
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#1d1a16'
+  ctx.fillStyle = BRAND.colors.ink
   ctx.font = '84px Gloock, Georgia, serif'
-  ctx.fillText('CONFRA', W / 2, 170)
+  ctx.fillText(BRAND.wordmarkTop.toUpperCase(), W / 2, 170)
   ctx.font = '128px Gloock, Georgia, serif'
-  ctx.fillText('DA FIRMA', W / 2, 290)
+  ctx.fillText(BRAND.wordmarkMain.toUpperCase(), W / 2, 290)
 
   // polaroid
   const pw = 820
@@ -135,7 +136,7 @@ export async function makeStory(photo: Photo): Promise<File> {
   ctx.textAlign = 'left'
   ctx.font = '700 84px Caveat, cursive'
   ctx.fillStyle = photo.frame === 'gold' ? '#3a2a08' : photo.frame === 'dark' ? '#f1e9d6' : '#2a241c'
-  ctx.fillText(photo.caption || 'confra da firma', px + pad + 6, py + pad + photoH + 120, photoW - 12)
+  ctx.fillText(photo.caption || BRAND.name.toLowerCase(), px + pad + 6, py + pad + photoH + 120, photoW - 12)
   ctx.font = 'bold 36px "Courier New", monospace'
   ctx.fillStyle = '#ff9a3d'
   ctx.shadowColor = 'rgba(255,120,30,.9)'
@@ -146,9 +147,9 @@ export async function makeStory(photo: Photo): Promise<File> {
 
   ctx.textAlign = 'center'
   ctx.font = '600 40px Outfit, sans-serif'
-  ctx.fillStyle = '#a5770f'
-  ctx.fillText(`por ${photo.author} · 07/11`, W / 2, py + ph + 110)
+  ctx.fillStyle = BRAND.colors.goldDeep
+  ctx.fillText(`por ${photo.author} · ${BRAND.shortDate}`, W / 2, py + ph + 110)
 
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('canvas'))), 'image/jpeg', 0.95))
-  return new File([blob], `confra26-story-${photo.id.slice(0, 8)}.jpg`, { type: 'image/jpeg' })
+  return new File([blob], `${BRAND.slug}-story-${photo.id.slice(0, 8)}.jpg`, { type: 'image/jpeg' })
 }

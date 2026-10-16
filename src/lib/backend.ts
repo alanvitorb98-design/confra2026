@@ -6,14 +6,18 @@ import * as outbox from './outbox'
 import { makePreview, storageCopy } from './preview'
 import { termsAccepted } from './terms'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
+import { BRAND, storageKey } from '../brand/brand'
 
-// Public project address and publishable key: safe in the browser, every write is checked by the database.
-const URL_ = 'https://optapzbhyhklcirdoyid.supabase.co'
-const KEY = 'sb_publishable_9PN8BMaKHBKkCdmIylVa-w_ajGUMRv3'
+// Public project address and publishable key of this event's own Supabase (see src/brand/brand.ts): safe in
+// the browser, every write is checked by the database. No fallback on purpose, so a copy never talks to
+// another event's database.
+const URL_: string = BRAND.supabaseUrl
+const KEY: string = BRAND.supabaseKey
+if (!URL_ || !KEY) throw new Error('Faltam VITE_SUPABASE_URL e VITE_SUPABASE_KEY no .env deste evento')
 const BUCKET = 'fotos'
 
 // The login session stays on the phone, so a guest signs in once.
-export const db = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: 'confra26.session' } })
+export const db = createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true, storageKey: storageKey('session') } })
 
 // Photos live in a private bucket: the app asks for links that expire, so a leaked link stops working.
 const LINK_TTL = 6 * 3600
@@ -84,7 +88,7 @@ export async function readOriginal(path: string) {
 }
 
 /** The event code from the invitation QR (?c=...), remembered on this phone. */
-const CODE_KEY = 'confra26.code'
+const CODE_KEY = storageKey('code')
 export function eventCode(): string {
   try {
     const q = new URLSearchParams(location.search).get('c')

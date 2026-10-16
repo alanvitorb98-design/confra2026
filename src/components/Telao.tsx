@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Photo } from '../lib/types'
 import { PolaroidFrame } from './Polaroid'
 import { Logo } from './Logo'
+import { BRAND } from '../brand/brand'
 
 const APP_URL = `${location.origin}${import.meta.env.BASE_URL}`
 const SLIDE_MS = 8000
@@ -47,7 +48,7 @@ export function Telao({ photos, onClose }: { photos: Photo[]; onClose: () => voi
   }, [i, fresh, list.length])
 
   useEffect(() => {
-    QRCode.toDataURL(APP_URL, { width: 360, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#1d1a16', light: '#fffdf7' } }).then(setQr, () => undefined)
+    QRCode.toDataURL(APP_URL, { width: 360, margin: 1, errorCorrectionLevel: 'M', color: { dark: BRAND.colors.ink, light: '#fffdf7' } }).then(setQr, () => undefined)
   }, [])
 
   // fullscreen and keep the screen on; both may be refused, the slideshow works anyway

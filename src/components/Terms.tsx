@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { useState } from 'react'
 import { TERMS_KEY, TERMS_VERSION } from '../lib/terms'
 
-/** The house rules, shown once after "Bora!". Short on purpose, but it is the guest's consent. */
+/** The house rules, shown once after the opening screen. Short on purpose, but it is the guest's consent. */
 export function Terms({ onAccept }: { onAccept: () => void }) {
   const [ok, setOk] = useState(false)
   return (

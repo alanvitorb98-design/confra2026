@@ -3,8 +3,9 @@ import { useState } from 'react'
 import { JoinError } from '../lib/backend'
 import type { Guest } from '../lib/types'
 import { Logo } from './Logo'
-import { PartyScene } from './PartyScene'
+import { PartyScene } from '../brand/PartyScene'
 import { SelfieCam } from './SelfieCam'
+import { BRAND } from '../brand/brand'
 
 type NewGuest = Omit<Guest, 'id'>
 
@@ -32,7 +33,7 @@ export function Welcome({ code, onEnter, onBack }: { code: string; onEnter: (cod
       <PartyScene variant="ambient" />
       <div className="logo-block">
         <Logo />
-        <p className="logo-sub">Equipe Derhu · 07/11</p>
+        <p className="logo-sub">{BRAND.welcomeSub}</p>
       </div>
 
       {back ? (
@@ -60,7 +61,7 @@ export function Welcome({ code, onEnter, onBack }: { code: string; onEnter: (cod
       >
         <label className="field">
           <span>Seu nome</span>
-          <input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="como te chamam na firma" autoComplete="given-name" />
+          <input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder={BRAND.namePlaceholder} autoComplete="given-name" />
         </label>
         <label className="field">
           <span>Instagram <em>opcional</em></span>
@@ -69,7 +70,7 @@ export function Welcome({ code, onEnter, onBack }: { code: string; onEnter: (cod
 
         <div className="consent">
           <b>Bora brincar de paparazzi?</b>
-          <p>Pra valer as missões e o ranking de quem mais aparece, a gente reconhece seu rosto nas fotos. Seu rosto só é usado aqui na confra e é apagado depois da festa.</p>
+          <p>Pra valer as missões e o ranking de quem mais aparece, a gente reconhece seu rosto nas fotos. Seu rosto só é usado {BRAND.faceScope} e é apagado depois da festa.</p>
           <div className="consent-choice">
             <button type="button" className={`chip${faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(true)}>Topo!</button>
             <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>

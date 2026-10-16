@@ -1,5 +1,6 @@
 import { zipSync } from 'fflate'
 import { db, readOriginal } from './backend'
+import { BRAND } from '../brand/brand'
 
 // "Baixar todas as fotos" in the organizer panel: every photo still in the app, full quality,
 // in zip files of about 300 MB (photos are already compressed, so the zip only stores them).
@@ -22,7 +23,7 @@ function save(files: Record<string, Uint8Array>, part: number) {
   const url = URL.createObjectURL(new Blob([zip], { type: 'application/zip' }))
   const a = document.createElement('a')
   a.href = url
-  a.download = `confra26-fotos-${String(part).padStart(2, '0')}.zip`
+  a.download = `${BRAND.slug}-fotos-${String(part).padStart(2, '0')}.zip`
   document.body.append(a)
   a.click()
   a.remove()
