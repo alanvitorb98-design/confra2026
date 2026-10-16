@@ -53,6 +53,20 @@ async function r2Link(op: 'put' | 'get', path: string) {
   return (await res.json()) as { url?: string; exists?: boolean }
 }
 
+/** Upload links for several files of one photo in a single call (original, 1080px copy, thumbnail) */
+async function r2Many(paths: string[]) {
+  const { data } = await db.auth.getSession()
+  const token = data.session?.access_token
+  if (!token) throw new Error('sem login')
+  const res = await fetch(`${R2_FN}?op=put-many`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, apikey: KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths }),
+  })
+  if (!res.ok) throw new Error(`r2 ${res.status}`)
+  return ((await res.json()) as { paths: Record<string, { url?: string; exists?: boolean }> }).paths
+}
+
 /** Organizer: is R2 on, and let the app's site talk to the bucket */
 export const r2Status = () => r2On()
 export async function r2Setup() {
@@ -135,8 +149,8 @@ export async function hasSession() {
 export const leave = () => db.auth.signOut()
 
 /** A light copy (1600px) only for face matching; the face server deletes it once read. */
-async function lightCopy(file: Blob, width: number) {
-  const url = await makePreview(file as File, width)
+async function lightCopy(file: Blob, width: number, quality?: number) {
+  const url = await makePreview(file as File, width, quality)
   try {
     return await fetch(url).then((r) => r.blob())
   } finally {
@@ -261,6 +275,11 @@ interface PhotoRow {
   mission_ok?: boolean | null
   /** the original is on Cloudflare R2 instead of the bucket */
   on_r2?: boolean
+  /** small copy for the grid, in the bucket (photos sent before it existed have none) */
+  thumb_path?: string | null
+  /** light copies on R2: viewing links signed by the server (renewed daily) */
+  thumb_url?: string | null
+  preview_url?: string | null
   /** posted by an organizer outside the hours: only organizers see it */
   test?: boolean
   /** last change on the server: what the feed asks for since */
@@ -288,6 +307,13 @@ interface ReactionRow {
   active: boolean
   created_at?: string
 }
+
+/** what of a photo is read from the app's bucket and needs a link: R2 copies come with their own */
+const signable = (x: PhotoRow) => [
+  ...(x.preview_url ? [] : [x.preview_path]),
+  ...(x.thumb_path ? [x.thumb_path] : []),
+  ...(x.on_r2 ? [] : [x.original_path]),
+]
 
 const rKey = (r: Pick<ReactionRow, 'photo_id' | 'guest_id' | 'emoji'>) => `${r.photo_id}|${r.guest_id}|${r.emoji}`
 
@@ -389,7 +415,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
     const mergePhotos = (list: PhotoRow[]) => {
       if (!list.length) return
       for (const row of list) if (!guestsRef.current.has(row.guest_id)) void loadGuests()
-      void sign(list.filter((x) => !x.removed_at).flatMap((x) => (x.on_r2 ? [x.preview_path] : [x.preview_path, x.original_path])))
+      void sign(list.filter((x) => !x.removed_at).flatMap((x) => signable(x)))
       setRows((m) => {
         const next = new Map(m)
         for (const row of list) {
@@ -467,7 +493,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       }
       setGuests(new Map(g.data.map((x) => [x.id as string, x.name as string])))
       setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
-      void sign((p.data as PhotoRow[]).flatMap((x) => (x.on_r2 ? [x.preview_path] : [x.preview_path, x.original_path])))
+      void sign((p.data as PhotoRow[]).flatMap((x) => signable(x)))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
       // an empty table still gets a starting point, so the next look only asks for what is new
       const start = new Date(Date.now() - 60_000).toISOString()
@@ -534,9 +560,10 @@ export function useParty(me: Guest | null, peopleOn = false) {
       tilt: row.tilt,
       takenAt: new Date(row.created_at),
       // on screen an R2 original is stood in for by the preview; the download fetches the real file
-      url: l?.url ?? (row.on_r2 ? links.get(row.preview_path) : links.get(row.original_path)),
+      url: l?.url ?? (row.on_r2 ? (row.preview_url ?? links.get(row.preview_path)) : links.get(row.original_path)),
       r2Path: row.on_r2 ? row.original_path : undefined,
-      preview: l?.preview ?? links.get(row.preview_path),
+      preview: l?.preview ?? row.preview_url ?? links.get(row.preview_path),
+      thumb: l?.preview ?? row.thumb_url ?? (row.thumb_path ? links.get(row.thumb_path) : undefined),
       file: l?.file,
       bytes: row.bytes ?? l?.file.size,
       status: l?.status === 'sent' ? undefined : l?.status,
@@ -686,22 +713,32 @@ export function useParty(me: Guest | null, peopleOn = false) {
         const { error } = await db.storage.from(BUCKET).upload(path, body, { contentType: type, cacheControl: '31536000', upsert: false })
         // a retry after a half-finished attempt finds the file already there
         if (error && !/exists|Duplicate/i.test(error.message)) {
-          note(`upload ${path.endsWith('-p.jpg') ? 'preview' : 'original'}`, error)
+          note(`upload ${/-[pt]\.jpg$/.test(path) ? 'preview' : 'original'}`, error)
           throw error
         }
       }
-      await up(row.preview_path, previewBlob, 'image/jpeg')
+      // the 1080px copy and a ~30 KB thumbnail for the grid go to R2 when it is on (no download fees),
+      // else to the app's bucket; the original goes to R2 too and falls back to the bucket on its own
+      const thumbPath = row.preview_path.replace(/-p\.jpg$/, '-t.jpg')
+      const thumbBlob = await lightCopy(previewBlob, 480, 0.72)
+      const r2Put = (await r2On()) ? await r2Many([row.original_path, row.preview_path, thumbPath]).catch((e) => (note('r2', e), null)) : null
+      const toR2 = async (path: string, body: Blob, type: string) => {
+        const link = r2Put?.[path]
+        if (!link) return false
+        if (link.exists) return true
+        const res = await fetch(link.url!, { method: 'PUT', body, headers: { 'Content-Type': type } }).catch((e) => (note('r2', e), null))
+        if (!res?.ok) note('r2', new Error(`r2 upload ${res?.status}`))
+        return !!res?.ok
+      }
+      const lightOnR2 = (await toR2(row.preview_path, previewBlob, 'image/jpeg')) && (await toR2(thumbPath, thumbBlob, 'image/jpeg'))
+      if (!lightOnR2) {
+        await up(row.preview_path, previewBlob, 'image/jpeg')
+        await up(thumbPath, thumbBlob, 'image/jpeg').catch(() => undefined)
+      }
       // party photos also get a 1600px copy for the face server, deleted after it is read
       if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
-      // straight to R2 with a short-lived link; the database notices the original isn't in its bucket.
-      // If R2 fails for any reason the original goes to the app's own bucket instead.
-      const toR2 = async () => {
-        const { url, exists } = await r2Link('put', row.original_path)
-        if (exists) return
-        const res = await fetch(url!, { method: 'PUT', body: stored, headers: { 'Content-Type': stored.type || 'image/jpeg' } })
-        if (!res.ok) throw new Error(`r2 upload ${res.status}`)
-      }
-      const onR2 = (await r2On()) && (await toR2().then(() => true, (e) => (note('r2', e), false)))
+      // the database notices the original isn't in its bucket
+      const onR2 = await toR2(row.original_path, stored, stored.type || 'image/jpeg')
       if (onR2) row = { ...row, on_r2: true }
       else await up(row.original_path, stored, stored.type || 'image/jpeg')
       const { error } = await db.rpc('send_photo', {

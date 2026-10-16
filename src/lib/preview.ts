@@ -3,7 +3,7 @@
  * while it animates, which is what makes the develop and the feed stutter. The original File
  * stays untouched for downloads and the story card.
  */
-export async function makePreview(file: Blob, width = 1080): Promise<string> {
+export async function makePreview(file: Blob, width = 1080, quality = 0.9): Promise<string> {
   try {
     const bitmap = await createImageBitmap(file, { resizeWidth: width, resizeQuality: 'high', imageOrientation: 'from-image' })
     const canvas = document.createElement('canvas')
@@ -11,7 +11,7 @@ export async function makePreview(file: Blob, width = 1080): Promise<string> {
     canvas.height = bitmap.height
     canvas.getContext('2d')!.drawImage(bitmap, 0, 0)
     bitmap.close()
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
     if (blob) return URL.createObjectURL(blob)
   } catch {
     // older browsers without resize options: fall back to the original

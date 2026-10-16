@@ -33,6 +33,8 @@ export interface Photo {
   url?: string
   /** Light copy (about 1080px wide) used on screen while animating */
   preview?: string
+  /** Small copy (480px) for the grid; missing on older photos */
+  thumb?: string
   /** The untouched camera file, for downloads */
   file?: File
   /** Path of the original on R2 (read through the app's r2 function), when it isn't in url */
