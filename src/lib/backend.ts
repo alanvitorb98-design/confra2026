@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
 import { stripGps } from './exif'
+import * as outbox from './outbox'
 import { makePreview, storageCopy } from './preview'
 import { termsAccepted } from './terms'
 import type { Frame, Guest, Mission, Photo, Reaction, Wall } from './types'
@@ -262,6 +263,8 @@ interface PhotoRow {
   on_r2?: boolean
   /** posted by an organizer outside the hours: only organizers see it */
   test?: boolean
+  /** last change on the server: what the feed asks for since */
+  updated_at?: string
 }
 
 export interface MissionRow {
@@ -283,6 +286,7 @@ interface ReactionRow {
   guest_id: string
   emoji: Reaction
   active: boolean
+  created_at?: string
 }
 
 const rKey = (r: Pick<ReactionRow, 'photo_id' | 'guest_id' | 'emoji'>) => `${r.photo_id}|${r.guest_id}|${r.emoji}`
@@ -364,12 +368,87 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (alive && data) setMissionRows(data as MissionRow[])
     }
 
+    // what changed is asked "since" the newest change already seen, a little before it: a change that
+    // started earlier but finished later is caught by the overlap (rows are merged by id, so twice is fine)
+    const OVERLAP_MS = 15_000
+    const cursor = { photos: '', reactions: '', faces: '' }
+    const since = (at: string) => new Date(Date.parse(at) - OVERLAP_MS).toISOString()
+    const advance = (key: keyof typeof cursor, ats: (string | undefined)[]) => {
+      for (const at of ats) if (at && at > cursor[key]) cursor[key] = at
+    }
+
     const loadFaces = async () => {
-      const { data } = await db.from('photo_faces').select('photo_id,guest_id')
+      const { data } = await db.from('photo_faces').select('photo_id,guest_id,updated_at')
       if (!alive || !data) return
       const m = new Map<string, Set<string>>()
       for (const f of data) m.set(f.photo_id, (m.get(f.photo_id) ?? new Set()).add(f.guest_id))
+      advance('faces', data.map((f) => f.updated_at as string))
       setFaces(m)
+    }
+
+    const mergePhotos = (list: PhotoRow[]) => {
+      if (!list.length) return
+      for (const row of list) if (!guestsRef.current.has(row.guest_id)) void loadGuests()
+      void sign(list.filter((x) => !x.removed_at).flatMap((x) => (x.on_r2 ? [x.preview_path] : [x.preview_path, x.original_path])))
+      setRows((m) => {
+        const next = new Map(m)
+        for (const row of list) {
+          if (row.removed_at) next.delete(row.id)
+          else next.set(row.id, row)
+        }
+        return next
+      })
+    }
+
+    // only what changed since the last look: cheap enough to run on every nudge and every return to the app
+    const catchUp = async (what: string[] = ['photos', 'reactions', 'photo_faces', 'missions', 'event_config']) => {
+      if (!cursor.photos) return load()
+      const jobs: Promise<unknown>[] = []
+      if (what.includes('photos'))
+        jobs.push(
+          (async () => {
+            const { data } = await db.from('photos').select('*').gt('updated_at', since(cursor.photos))
+            if (!alive || !data) return
+            advance('photos', data.map((x) => x.updated_at))
+            mergePhotos(data as PhotoRow[])
+          })(),
+        )
+      if (what.includes('reactions') && cursor.reactions)
+        jobs.push(
+          (async () => {
+            const { data } = await db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').gt('created_at', since(cursor.reactions))
+            if (!alive || !data?.length) return
+            advance('reactions', data.map((x) => x.created_at))
+            setReactions((m) => {
+              const next = new Map(m)
+              for (const r of data as ReactionRow[]) next.set(rKey(r), r)
+              return next
+            })
+          })(),
+        )
+      if (what.includes('photo_faces') && cursor.faces)
+        jobs.push(
+          (async () => {
+            const { data } = await db.rpc('faces_since', { p_since: since(cursor.faces) })
+            if (!alive || !data?.length) return
+            const list = data as { photo_id: string; guest_id: string; shown: boolean; at: string }[]
+            advance('faces', list.map((f) => f.at))
+            setFaces((m) => {
+              const next = new Map(m)
+              for (const f of list) {
+                const set = new Set(next.get(f.photo_id) ?? [])
+                if (f.shown) set.add(f.guest_id)
+                else set.delete(f.guest_id)
+                next.set(f.photo_id, set)
+              }
+              return next
+            })
+          })(),
+        )
+      if (what.includes('photo_faces') && !cursor.faces) jobs.push(loadFaces())
+      if (what.includes('missions')) jobs.push(loadMissions())
+      if (what.includes('event_config')) jobs.push(loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1)))
+      await Promise.all(jobs)
     }
 
     const load = async () => {
@@ -379,7 +458,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       const [g, p, r] = await Promise.all([
         db.from('guests').select('id,name'),
         db.from('photos').select('*').is('removed_at', null).order('created_at', { ascending: false }),
-        db.from('reactions').select('photo_id,guest_id,emoji,active').eq('active', true),
+        db.from('reactions').select('photo_id,guest_id,emoji,active,created_at').eq('active', true),
       ])
       if (!alive) return
       if (g.error || p.error || r.error) {
@@ -390,48 +469,40 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
       void sign((p.data as PhotoRow[]).flatMap((x) => (x.on_r2 ? [x.preview_path] : [x.preview_path, x.original_path])))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
+      // an empty table still gets a starting point, so the next look only asks for what is new
+      const start = new Date(Date.now() - 60_000).toISOString()
+      cursor.photos = start
+      cursor.reactions = start
+      advance('photos', (p.data as PhotoRow[]).map((x) => x.updated_at))
+      advance('reactions', (r.data as ReactionRow[]).map((x) => x.created_at))
       setState('live')
     }
 
+    // the database sends a tiny nudge at most every few seconds naming what changed (never the data, so
+    // a party of hundreds stays within the live limits); each phone then asks only for what is new
     const channel = db
-      .channel('party')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'photos' }, ({ new: n }) => {
-        const row = n as PhotoRow
-        if (!row.id) return
-        // someone who just joined: fetch the names again
-        if (!guestsRef.current.has(row.guest_id)) loadGuests()
-        if (!row.removed_at) void sign(row.on_r2 ? [row.preview_path] : [row.preview_path, row.original_path])
-        setRows((m) => {
-          const next = new Map(m)
-          if (row.removed_at) next.delete(row.id)
-          else next.set(row.id, row)
-          return next
-        })
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'missions' }, () => void loadMissions())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'photo_faces' }, () => void loadFaces())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_config' }, () => {
-        void loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1))
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reactions' }, ({ new: n }) => {
-        const row = n as ReactionRow
-        if (!row.photo_id) return
-        setReactions((m) => new Map(m).set(rKey(row), row))
-      })
+      .channel('live')
+      .on('broadcast', { event: 'tick' }, ({ payload }) => void catchUp(Array.isArray(payload?.t) ? payload.t : undefined))
       .subscribe((status) => {
-        // reload on every re-subscribe so nothing is missed while the socket was down
-        if (status === 'SUBSCRIBED' && subscribedOnce) load()
+        // catch up on every re-subscribe so nothing is missed while the socket was down
+        if (status === 'SUBSCRIBED' && subscribedOnce) void catchUp()
         if (status === 'SUBSCRIBED') subscribedOnce = true
         socketUp = status === 'SUBSCRIBED'
       })
 
     // read right away too: some networks block the live socket, the feed still shows
     load()
-    // without the socket, check for new photos every half minute
-    const poll = setInterval(() => !socketUp && document.visibilityState === 'visible' && load(), 30_000)
+    // a look now and then anyway: every 20 s without the socket, every minute with it (a missed nudge)
+    let lastLook = Date.now()
+    const poll = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (Date.now() - lastLook < (socketUp ? 60_000 : 20_000)) return
+      lastLook = Date.now()
+      void catchUp()
+    }, 5_000)
 
-    // phones drop sockets in the background: refresh when the app comes back
-    const wake = () => document.visibilityState === 'visible' && load()
+    // phones drop sockets in the background: catch up when the app comes back
+    const wake = () => document.visibilityState === 'visible' && void catchUp()
     document.addEventListener('visibilitychange', wake)
 
     return () => {
@@ -648,6 +719,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
         note('send_photo', error)
         throw error
       }
+      // the server has it: the phone no longer needs to hold it for a retry
+      void outbox.done(row.id)
       // keep the local copy: the original stays on this phone for instant downloads
       setLocal((m) => {
         const cur = m.get(row.id)
@@ -658,6 +731,44 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setLocal((m) => new Map(m).set(row.id, { ...l, row, status: 'failed' }))
     }
   }
+
+  // photos still on this phone from before (app closed, no signal): show them and send them again on
+  // their own, when the app opens, when the signal comes back and every half minute while it fails
+  useEffect(() => {
+    if (!me) return
+    let alive = true
+    const tries = new Map<string, number>()
+    const resend = async () => {
+      if (!navigator.onLine || document.visibilityState !== 'visible') return
+      for (const p of await outbox.waiting(me.id)) {
+        if (!alive) return
+        // a week old: the party is long over
+        if (Date.now() - p.at > 7 * 86400_000) {
+          void outbox.done(p.id)
+          continue
+        }
+        const cur = localRef.current.get(p.id)
+        if (cur?.status === 'sending' || cur?.status === 'sent') continue
+        const n = tries.get(p.id) ?? 0
+        // after a few tries it waits for the person's own "tentar de novo"
+        if (n >= 8) continue
+        tries.set(p.id, n + 1)
+        const file = new File([p.file], p.fileName, { type: p.file.type })
+        const l: Local = cur ?? { file, url: URL.createObjectURL(file), preview: URL.createObjectURL(p.preview), row: p.row as PhotoRow, status: 'failed' }
+        if (!cur) setLocal((m) => new Map(m).set(p.id, l))
+        await send(l)
+      }
+    }
+    void resend()
+    const timer = setInterval(() => void resend(), 30_000)
+    window.addEventListener('online', resend)
+    return () => {
+      alive = false
+      clearInterval(timer)
+      window.removeEventListener('online', resend)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id])
 
   /** Posts a photo: shows it at once, uploads the preview and the untouched original, then publishes it. */
   const post = (file: File, preview: string, kind: Wall, caption: string, frame: Frame, missionId?: string) => {
@@ -679,7 +790,13 @@ export function useParty(me: Guest | null, peopleOn = false) {
       removed_at: null,
       mission_id: kind === 'party' ? (missionId ?? null) : null,
     }
-    void send({ file, url: URL.createObjectURL(file), preview, row, status: 'sending' })
+    const l: Local = { file, url: URL.createObjectURL(file), preview, row, status: 'sending' }
+    // kept on the phone first, so the photo survives the app closing before it is sent
+    void fetch(preview)
+      .then((r) => r.blob())
+      .then((blob) => outbox.keep({ id, guest: me.id, row, file, fileName: file.name, preview: blob, at: Date.now() }))
+      .catch(() => undefined)
+      .then(() => send(l))
   }
 
   const retry = (id: string) => {

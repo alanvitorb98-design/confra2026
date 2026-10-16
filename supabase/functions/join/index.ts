@@ -8,7 +8,7 @@ const ANON = Deno.env.get('SUPABASE_ANON_KEY')!
 
 const ORIGINS = ['https://alanvitorb98-design.github.io', 'http://localhost:4175', 'http://localhost:5173']
 // the party wifi puts many guests behind one address
-const MAX_JOINS_PER_HOUR = 150
+const MAX_JOINS_PER_HOUR = 600
 const MAX_GUESTS = 1500
 // wrong códigos de volta per network before it has to wait
 const MAX_BACK_MISSES_PER_HOUR = 20
