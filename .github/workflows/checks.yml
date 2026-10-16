@@ -46,6 +46,8 @@ jobs:
           version: latest
       - name: Start a local Supabase
         run: |
+          # supabase/migrations only holds recent changes, not the whole database: the snapshot below is loaded instead
+          mv supabase/migrations "$RUNNER_TEMP/migrations"
           supabase init --force >/dev/null
           supabase start -x studio,imgproxy,mailpit,logflare,vector,edge-runtime,supavisor,postgres-meta
       - name: Load the database
