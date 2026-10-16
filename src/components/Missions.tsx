@@ -53,18 +53,18 @@ export function Missions({ missions, people, onSwap, onShoot, locked, phase }: P
   return (
     <div className="page">
       <h2 className="page-title">Missões</h2>
-      <p className="page-lead">A missão com gente é sorteada só pra você. As outras vêm uma por vez, numa ordem só sua. Cumpra tirando a foto pedida e a próxima aparece.</p>
+      <p className="page-lead">A missão com gente é sorteada só pra você. As extras vêm uma por vez, numa ordem só sua. Cumpra tirando a foto pedida e a próxima aparece.</p>
       <PeopleMission people={people} onSwap={onSwap} onShoot={onShoot} />
       {missions.length === 0 && people.off && <p className="page-note">Nenhuma missão no ar agora. Fica de olho!</p>}
       {missions.length > 0 && (
         <p className="mission-progress">
-          {done.length} de {missions.length} cumpridas
+          {done.length} de {missions.length} extras cumpridas
         </p>
       )}
       <ul className="missions">
         {current && (
           <li key={current.id} className="mission hot">
-            <span className="mission-badge">Missão {done.length + 1}</span>
+            <span className="mission-badge">Extra {done.length + 1}</span>
             <span className="mission-title">{current.title}</span>
             <span className="mission-pts">+{current.points}</span>
             {current.target && <span className="mission-hint">Vale quando o rosto de {current.target} aparecer na foto.</span>}
@@ -74,12 +74,12 @@ export function Missions({ missions, people, onSwap, onShoot, locked, phase }: P
           </li>
         )}
         {left > 0 && (
-          <li className="mission next" aria-label={`Mais ${left} ${left === 1 ? 'missão' : 'missões'} depois desta`}>
-            <span className="mission-title">{left === 1 ? 'Mais 1 missão' : `Mais ${left} missões`} depois desta</span>
+          <li className="mission next" aria-label={`Mais ${left} ${left === 1 ? 'missão extra' : 'missões extras'} depois desta`}>
+            <span className="mission-title">{left === 1 ? 'Mais 1 extra' : `Mais ${left} extras`} depois desta</span>
             <span className="mission-pts"><LockIcon /></span>
           </li>
         )}
-        {!current && missions.length > 0 && <li className="mission all-done"><span className="mission-title">Você cumpriu todas! Se aparecer missão nova, ela chega aqui.</span></li>}
+        {!current && missions.length > 0 && <li className="mission all-done"><span className="mission-title">Você cumpriu todas as extras! Se aparecer outra, ela chega aqui.</span></li>}
         {done.map((m) => (
           <li key={m.id} className="mission done">
             <span className="mission-title">{m.title}</span>
