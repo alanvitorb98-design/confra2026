@@ -396,6 +396,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
   localRef.current = local
   // photos deleted by their author while still on their way: they must never be published
   const cancelled = useRef(new Set<string>())
+  // removing a photo is final: once a photo is seen removed, an older answer arriving late never brings it back
+  const gone = useRef(new Set<string>())
   const guestsRef = useRef(guests)
   guestsRef.current = guests
 
@@ -459,8 +461,10 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setRows((m) => {
         const next = new Map(m)
         for (const row of list) {
-          if (row.removed_at) next.delete(row.id)
-          else next.set(row.id, row)
+          if (row.removed_at) {
+            gone.current.add(row.id)
+            next.delete(row.id)
+          } else if (!gone.current.has(row.id)) next.set(row.id, row)
         }
         return next
       })
@@ -536,7 +540,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
         return
       }
       setGuests(new Map(g.data.map((x) => [x.id as string, x.name as string])))
-      setRows(new Map((p.data as PhotoRow[]).map((x) => [x.id, x])))
+      setRows(new Map((p.data as PhotoRow[]).filter((x) => !gone.current.has(x.id)).map((x) => [x.id, x])))
       void sign((p.data as PhotoRow[]).flatMap((x) => signable(x)))
       setReactions(new Map((r.data as ReactionRow[]).map((x) => [rKey(x), x])))
       // an empty table still gets a starting point; it comes from the server's own times as soon as
@@ -645,7 +649,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (!rows.has(photo)) continue
       for (const g of set) count.set(g, (count.get(g) ?? 0) + 1)
     }
-    return [...count].map(([g, value]) => ({ name: guests.get(g) ?? 'Convidado', value })).sort((a, b) => b.value - a.value)
+    return [...count].map(([g, value]) => ({ id: g, name: guests.get(g) ?? 'Convidado', value })).sort((a, b) => b.value - a.value)
   }, [faces, rows, guests])
 
   // a mission counts once per guest, from a photo the server accepted for it (when it names someone,
@@ -693,7 +697,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
     const peopleDone = mine.filter((m) => done.has(m.id)).map(asMission)
     const swapsUsed = mine.filter((m) => !m.active && !done.has(m.id)).length
     const points = [...byGuest]
-      .map(([g, set]) => ({ name: guests.get(g) ?? 'Convidado', value: [...set].reduce((a, id) => a + (value.get(id) ?? 0), 0) }))
+      .map(([g, set]) => ({ id: g, name: guests.get(g) ?? 'Convidado', value: [...set].reduce((a, id) => a + (value.get(id) ?? 0), 0) }))
       .filter((e) => e.value > 0)
       .sort((a, b) => b.value - a.value)
     return { missions, points, peopleOpen: peopleOpen && asMission(peopleOpen), peopleDone, swapsUsed }
@@ -729,6 +733,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
     void outbox.done(photoId)
     const { error } = await db.rpc('hide_photo', { p_id: photoId })
     if (error) throw error
+    gone.current.add(photoId)
     setRows((m) => {
       const next = new Map(m)
       next.delete(photoId)
@@ -765,8 +770,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (stored !== file) row = { ...row, original_path: row.original_path.replace(/\.[^.]+$/, '.jpg'), bytes: stored.size }
       const up = async (path: string, body: Blob, type: string) => {
         const { error } = await db.storage.from(BUCKET).upload(path, body, { contentType: type, cacheControl: '31536000', upsert: false })
-        // a retry after a half-finished attempt finds the file already there
-        if (error && !/exists|Duplicate/i.test(error.message)) {
+        // a retry after a half-finished attempt finds the file already there (with a full quota the server
+        // answers with the quota refusal instead of "already exists", so ask whether it is there)
+        if (error && !/exists|Duplicate/i.test(error.message) && !(await db.storage.from(BUCKET).exists(path).then((r) => r.data, () => false))) {
           note(`upload ${/-[pt]\.jpg$/.test(path) ? 'preview' : 'original'}`, error)
           throw error
         }

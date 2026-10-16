@@ -24,11 +24,11 @@ export function Ranking({ points, appearances, looks }: Props) {
       </div>
       <ol className="ranking">
         {list.map((e, i) => (
-          <li key={e.name} className={i < 3 ? `podium p${i + 1}` : undefined}>
+          <li key={e.id} className={i < 3 ? `podium p${i + 1}` : undefined}>
             <span className="rank-pos">{i + 1}</span>
             <span className="rank-name">{e.name}</span>
             <span className="rank-bar"><span style={{ width: `${(e.value / top) * 100}%` }} /></span>
-            <span className="rank-val"><CountUp key={tab + e.name} to={e.value} /> {e.value === 1 ? unit.replace(/s$/, '').replace('reaçõe', 'reação') : unit}</span>
+            <span className="rank-val"><CountUp key={tab + e.id} to={e.value} /> {e.value === 1 ? unit.replace(/s$/, '').replace('reaçõe', 'reação') : unit}</span>
           </li>
         ))}
       </ol>
