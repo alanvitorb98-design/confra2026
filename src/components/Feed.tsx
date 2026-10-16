@@ -174,7 +174,7 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props)
             >
               <PolaroidFrame frame={p.frame}>
                 <span className="polaroid-photo">
-                  {p.url ? <img src={p.preview ?? p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" crossOrigin="anonymous" /> : <span className="ph" style={{ background: p.placeholder }} />}
+                  {p.url ? <img src={p.thumb ?? p.preview ?? p.url} alt={p.caption || `Foto de ${p.author}`} loading="lazy" crossOrigin="anonymous" /> : <span className="ph" style={{ background: p.placeholder }} />}
                   <span className="stamp">{time(p.takenAt)}</span>
                 </span>
                 <figcaption>{p.caption || '\u00a0'}</figcaption>
