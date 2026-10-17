@@ -6,12 +6,36 @@ import { VitePWA } from 'vite-plugin-pwa'
 // so the app can tell whether a newer version is online.
 const VERSION = `${new Date().toISOString().slice(0, 16).replace('T', ' ')}${process.env.GITHUB_SHA ? ` · ${process.env.GITHUB_SHA.slice(0, 7)}` : ''}`
 
+// Content-Security-Policy for the built site. GitHub Pages can't send headers, so it goes in a meta tag.
+// Only the hosts the app talks to: Supabase (data, photos, live updates), Cloudflare R2 (photos),
+// Google Fonts and the OpenStreetMap address search in the organizer panel. Left out of `npm run dev`,
+// where Vite's live reload needs its own connections.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https:",
+  "media-src 'self' data: blob: https:",
+  "connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://nominatim.openstreetmap.org",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
 // BASE_PATH lets the GitHub Pages build live under /confra2026/
 export default defineConfig({
   base: process.env.BASE_PATH ?? '/',
   define: { __APP_VERSION__: JSON.stringify(VERSION) },
   plugins: [
     react(),
+    {
+      name: 'csp',
+      apply: 'build',
+      transformIndexHtml: (html: string) => html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="${CSP}" />`),
+    },
     {
       name: 'version-file',
       generateBundle() {
