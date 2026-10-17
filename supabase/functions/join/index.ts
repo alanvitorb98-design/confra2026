@@ -42,6 +42,17 @@ Deno.serve(async (req) => {
 
   const since = new Date(Date.now() - 3600_000).toISOString()
 
+  // a one-time sign-in made and used right here (no email is sent): the guest's other phones stay signed in
+  const signInAs = async (userId: string) => {
+    const { data: u } = await admin.auth.admin.getUserById(userId)
+    if (!u.user?.email) return null
+    const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email: u.user.email })
+    const hash = link?.properties?.hashed_token
+    if (linkError || !hash) return null
+    const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.verifyOtp({ token_hash: hash, type: 'magiclink' })
+    return signError ? null : signed.session
+  }
+
   // back into an existing account with its código de volta (another phone, browser, or cleared data)
   if (typeof body.back === 'string') {
     const tag = `volta:${ip}`
@@ -58,21 +69,15 @@ Deno.serve(async (req) => {
       ? await admin.from('guests').select('id, name, instagram, face_opt_in, user_id').eq('id', hit.guest_id).maybeSingle()
       : { data: null }
     if (!g?.user_id) return reply(404, { error: 'código' })
-    // a one-time sign-in made and used right here (no email is sent): the guest's other phones stay signed in
-    const { data: u } = await admin.auth.admin.getUserById(g.user_id)
-    if (!u.user?.email) return reply(500, { error: 'conta' })
-    const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email: u.user.email })
-    const hash = link?.properties?.hashed_token
-    if (linkError || !hash) return reply(500, { error: 'conta' })
-    const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.verifyOtp({ token_hash: hash, type: 'magiclink' })
-    if (signError || !signed.session) return reply(500, { error: 'sessao' })
+    const session = await signInAs(g.user_id)
+    if (!session) return reply(500, { error: 'sessao' })
     return reply(200, {
       guest_id: g.id,
       name: g.name,
       instagram: g.instagram,
       face: g.face_opt_in,
-      access_token: signed.session.access_token,
-      refresh_token: signed.session.refresh_token,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
     })
   }
 
@@ -89,6 +94,29 @@ Deno.serve(async (req) => {
   if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) return reply(400, { error: 'instagram' })
   // which version of the terms the guest accepted on the opening screen (kept as proof of consent)
   const terms = typeof body.terms === 'string' && /^[\w.-]{1,20}$/.test(body.terms) ? body.terms : null
+
+  // the same sign-up sent again (its answer was lost on the way): the guest it already made, not a second one.
+  // The key is the phone's own and works for 10 minutes only.
+  const key = typeof body.key === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.key) ? body.key : null
+  let keyMine = false
+  if (key) {
+    const { error: keyError } = await admin.from('join_keys').insert({ key })
+    keyMine = !keyError
+    if (keyError) {
+      // the first try may still be making the guest: wait for it a little
+      for (let i = 0; i < 10; i++) {
+        const { data: k } = await admin.from('join_keys').select('guest_id, created_at').eq('key', key).maybeSingle()
+        if (!k || Date.now() - Date.parse(k.created_at) > 10 * 60_000) break
+        if (k.guest_id) {
+          const { data: g } = await admin.from('guests').select('id, name, user_id').eq('id', k.guest_id).maybeSingle()
+          const session = g?.user_id ? await signInAs(g.user_id) : null
+          if (!session) break
+          return reply(200, { guest_id: g!.id, name: g!.name, access_token: session.access_token, refresh_token: session.refresh_token })
+        }
+        await new Promise((r) => setTimeout(r, 500))
+      }
+    }
+  }
 
   const email = `${crypto.randomUUID()}@convidados.confra`
   const password = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
@@ -108,6 +136,7 @@ Deno.serve(async (req) => {
     .select('id')
     .single()
   if (guestError) return reply(500, { error: 'convidado' })
+  if (keyMine) await admin.from('join_keys').update({ guest_id: guest.id }).eq('key', key)
 
   const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.signInWithPassword({ email, password })
   if (signError || !signed.session) return reply(500, { error: 'sessao' })

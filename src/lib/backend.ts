@@ -113,9 +113,24 @@ export class JoinError extends Error {
 }
 
 /** Checks the event code on the server, which creates the guest's login. */
+// made before the first try and sent with every try of the same sign-up: when an answer is lost on the
+// way and the guest taps "Entrar" again, the server signs into the guest it already made
+const JOIN_KEY = storageKey('joinkey')
+function joinKey() {
+  try {
+    const saved = localStorage.getItem(JOIN_KEY)
+    if (saved) return saved
+    const fresh = crypto.randomUUID()
+    localStorage.setItem(JOIN_KEY, fresh)
+    return fresh
+  } catch {
+    return undefined
+  }
+}
+
 export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
   const { data, error } = await db.functions.invoke('join', {
-    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted() },
+    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted(), key: joinKey() },
   })
   if (error) {
     const status = (error as { context?: Response }).context?.status
@@ -125,10 +140,12 @@ export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
   if (sessionError) throw new JoinError('other')
   try {
     localStorage.setItem(CODE_KEY, code)
+    localStorage.removeItem(JOIN_KEY)
   } catch {
     /* private mode */
   }
-  return { ...g, id: data.guest_id as string }
+  // on a repeat it is the guest made the first time (with the name sent then)
+  return { ...g, id: data.guest_id as string, name: (data.name as string | undefined) ?? g.name }
 }
 
 /** Back into an existing account on this phone with its código de volta, instead of joining again. */
@@ -839,8 +856,13 @@ export function useParty(me: Guest | null, peopleOn = false) {
     if (force && was) return
     const optimistic = { photo_id: photoId, guest_id: me.id, emoji, active: force || !was }
     setReactions((m) => new Map(m).set(key, optimistic))
-    const { data, error } = await db.rpc('react', { p_photo: photoId, p_emoji: emoji, p_force: force })
-    setReactions((m) => new Map(m).set(key, { ...optimistic, active: error ? was : (data as boolean) }))
+    // the state wanted, not a flip: sent twice or answered out of order, it ends the same
+    const { error } = await db.rpc('set_reaction', { p_photo: photoId, p_emoji: emoji, p_active: optimistic.active })
+    setReactions((m) => {
+      // a newer tap on the same reaction meanwhile wins over this answer
+      if (m.get(key) !== optimistic) return m
+      return new Map(m).set(key, { ...optimistic, active: error ? was : optimistic.active })
+    })
   }
 
   const send = async (l: Local) => {

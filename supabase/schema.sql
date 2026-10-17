@@ -2188,3 +2188,25 @@ alter publication supabase_realtime add table public.photos;
 alter publication supabase_realtime add table public.reactions;
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types) values ('fotos', 'fotos', false, 26214400, '{image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif}') on conflict (id) do nothing;
+
+
+create table if not exists public.join_keys (
+  key uuid primary key,
+  guest_id uuid references public.guests(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.join_keys enable row level security;
+revoke all on public.join_keys from public, anon, authenticated;
+
+create or replace function public.set_reaction(p_photo uuid, p_emoji text, p_active boolean)
+returns boolean language plpgsql security definer set search_path = '' as $$
+declare g uuid := public.my_guest();
+begin
+  if g is null then raise exception 'convidado não encontrado'; end if;
+  insert into public.reactions as r (photo_id, guest_id, emoji, active) values (p_photo, g, p_emoji, p_active)
+  on conflict (photo_id, guest_id, emoji) do update set active = excluded.active, created_at = now()
+  where r.active is distinct from excluded.active;
+  return p_active;
+end $$;
+revoke all on function public.set_reaction(uuid, text, boolean) from public, anon, authenticated;
+grant execute on function public.set_reaction(uuid, text, boolean) to authenticated;
