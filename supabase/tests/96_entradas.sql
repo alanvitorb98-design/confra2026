@@ -40,13 +40,14 @@ do $$ begin
   raise exception 'emoji fora da lista entrou';
 exception when check_violation then null;
 end $$;
+reset role;
 do $$ begin
-  perform public.update_profile(repeat('a', 41), null, false);
+  update public.guests set name = repeat('a', 41) where id = '10000000-0000-0000-0000-00000000000a';
   raise exception 'nome gigante entrou';
 exception when check_violation then null;
 end $$;
 do $$ begin
-  perform public.update_profile('Ana', 'ana" onclick="x', false);
+  update public.guests set instagram = 'ana" onclick="x' where id = '10000000-0000-0000-0000-00000000000a';
   raise exception 'instagram com aspas entrou';
 exception when check_violation then null;
 end $$;
