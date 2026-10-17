@@ -356,6 +356,7 @@ export interface MissionRow {
   owner?: string | null
   /** guests who have to appear, on a mission with people */
   targets?: string[] | null
+  updated_at?: string
 }
 
 interface ReactionRow {
@@ -475,24 +476,41 @@ export function useParty(me: Guest | null, peopleOn = false) {
         }
       })())
 
-    const loadMissions = async () => {
-      const { data } = await everyRow<MissionRow>((a, b) =>
-        db.from('missions').select('id,title,points,active,sort,target,owner,targets').order('sort').order('id').range(a, b),
-      )
-      if (!alive || !data) return
-      setMissionRows(data)
-      // a guest who joined after this phone read the names: read them again so missions say who to find
-      const known = guestsRef.current
-      if (data.some((m) => m.targets?.some((id) => !known.has(id)))) void loadGuests()
-    }
-
     // what changed is asked "since" the newest change already seen, a little before it: a change that
     // started earlier but finished later is caught by the overlap (rows are merged by id, so twice is fine)
     const OVERLAP_MS = 15_000
-    const cursor = { photos: '', reactions: '', faces: '' }
+    const cursor = { photos: '', reactions: '', faces: '', missions: '' }
     const since = (at: string) => new Date(Date.parse(at) - OVERLAP_MS).toISOString()
     const advance = (key: keyof typeof cursor, ats: (string | undefined)[]) => {
       for (const at of ats) if (at && at > cursor[key]) cursor[key] = at
+    }
+
+    const MISSION_COLS = 'id,title,points,active,sort,target,owner,targets,updated_at'
+    // a guest who joined after this phone read the names: read them again so missions say who to find
+    const missionNames = (list: MissionRow[]) => {
+      const known = guestsRef.current
+      if (list.some((m) => m.targets?.some((id) => !known.has(id)))) void loadGuests()
+    }
+    const loadMissions = async () => {
+      const { data } = await everyRow<MissionRow>((a, b) => db.from('missions').select(MISSION_COLS).order('sort').order('id').range(a, b))
+      if (!alive || !data) return
+      advance('missions', data.map((m) => m.updated_at))
+      setMissionRows(data)
+      missionNames(data)
+    }
+    // after a nudge, only the missions that changed (missions are never deleted, only turned off)
+    const missionsSince = async () => {
+      const { data } = await everyRow<MissionRow>((a, b) =>
+        db.from('missions').select(MISSION_COLS).gt('updated_at', since(cursor.missions)).order('updated_at').order('id').range(a, b),
+      )
+      if (!alive || !data?.length) return
+      advance('missions', data.map((m) => m.updated_at))
+      setMissionRows((rows) => {
+        const byId = new Map(rows.map((m) => [m.id, m]))
+        for (const m of data) byId.set(m.id, m)
+        return [...byId.values()].sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+      })
+      missionNames(data)
     }
 
     const loadFaces = async () => {
@@ -611,7 +629,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
           })(),
         )
       if (what.includes('photo_faces') && !facesFresh) jobs.push(loadFaces())
-      if (what.includes('missions')) jobs.push(loadMissions())
+      if (what.includes('missions')) jobs.push(cursor.missions ? missionsSince() : loadMissions())
       if (what.includes('event_config')) jobs.push(loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1)))
       await Promise.all(jobs)
     }
