@@ -5,7 +5,14 @@ import { fakeBackend } from './backend'
 const BEFORE = new Date('2026-10-20T12:00:00-03:00')
 const DURING = new Date('2026-11-07T11:00:00-03:00')
 
+// the built site carries a Content-Security-Policy: anything it blocks shows up as a console error
+let blocked: string[] = []
+
 test.beforeEach(async ({ page }) => {
+  blocked = []
+  page.on('console', (m) => {
+    if (m.type() === 'error' && m.text().includes('Content Security Policy')) blocked.push(m.text())
+  })
   await fakeBackend(page)
   await page.clock.install({ time: BEFORE })
 })
@@ -19,6 +26,8 @@ async function openInBrowser(page: Page) {
   await terms.getByLabel('Li e topo os combinados').check()
   await terms.getByRole('button', { name: 'Entrar' }).click()
 }
+
+test.afterEach(() => expect(blocked).toEqual([]))
 
 test('a guest gets from the link to the countdown, after accepting the terms', async ({ page }) => {
   const errors: string[] = []

@@ -1,0 +1,23 @@
+# ZAP baseline rules for this site. IGNORE only what GitHub Pages decides or what does not apply here.
+# GitHub Pages sends no custom headers: these can't be set from the repo (the CSP goes in index.html)
+10020	IGNORE	(Missing Anti-clickjacking Header)
+10021	IGNORE	(X-Content-Type-Options Header Missing)
+10035	IGNORE	(Strict-Transport-Security Header Not Set)
+10038	IGNORE	(Content Security Policy (CSP) Header Not Set)
+10063	IGNORE	(Permissions Policy Header Not Set)
+10098	IGNORE	(Cross-Domain Misconfiguration)
+90004	IGNORE	(Cross-Origin-Embedder-Policy Header Missing or Invalid)
+# GitHub's own 404 page for paths outside the app (its CSP, not ours)
+10055	IGNORE	(CSP: Failure to Define Directive with No Fallback)
+# cache notes: the app's files are public and versioned by name
+10015	IGNORE	(Re-examine Cache-control Directives)
+10049	IGNORE	(Storable and Cacheable Content)
+10050	IGNORE	(Retrieved from Cache)
+# the built JavaScript and icons contain base64 by design, no secrets
+10094	IGNORE	(Base64 Disclosure)
+# informational: ZAP noting the site is a JavaScript app
+10109	IGNORE	(Modern Web Application)
+# scripts come from the site itself, not a third-party CDN
+90003	IGNORE	(Sub Resource Integrity Attribute Missing)
+# about the scanner's own requests, not the site
+90005	IGNORE	(Sec-Fetch-Dest Header is Missing)
