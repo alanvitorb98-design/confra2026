@@ -38,7 +38,8 @@ test('the organizer box covers what is behind it', async ({ page }) => {
   await expect(box).toBeVisible()
   const bg = await box.evaluate((el) => getComputedStyle(el).backgroundColor)
   // fully opaque, so the place button behind it does not show through
-  expect(bg).not.toMatch(/rgba\(.*,\s*0(\.\d+)?\)$/)
+  const alpha = bg.startsWith('rgba(') ? Number(bg.slice(bg.lastIndexOf(',') + 1, -1)) : 1
+  expect(alpha).toBe(1)
 })
 
 test('during the party a new guest gets the sign-up form', async ({ page }) => {

@@ -1,0 +1,84 @@
+name: Segurança
+
+# Security scans. On every pull request: known flaws in the libraries the site ships (npm audit), insecure
+# code patterns and leaked keys (Semgrep), and Snyk once its token is set. Every Monday and on demand:
+# OWASP ZAP looks at the published site from the outside (passive scan: it reads pages, it attacks nothing).
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seguranca-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependencias:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # what reaches the guests' phones: any high or critical flaw fails the check
+      - run: npm audit --omit=dev --audit-level=high
+      # build and test tools only run here and on a developer's machine: listed, not blocking
+      - run: npm audit || true
+
+  semgrep:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install semgrep==1.181.0
+      - run: >
+          semgrep scan --metrics=off --error
+          --config p/javascript --config p/typescript --config p/react --config p/secrets --config p/github-actions
+          src e2e supabase/functions scripts .github
+
+  snyk:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Snyk (needs the SNYK_TOKEN secret)
+        if: env.SNYK_TOKEN != ''
+        run: npx --yes snyk@1 test --omit-dev --severity-threshold=high
+      - name: Snyk code
+        if: env.SNYK_TOKEN != ''
+        run: npx --yes snyk@1 code test --severity-threshold=high
+      - name: No Snyk token yet
+        if: env.SNYK_TOKEN == ''
+        run: echo "Snyk skipped - add the SNYK_TOKEN secret to turn it on."
+
+  zap:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: zaproxy/action-baseline@v0.12.0
+        with:
+          target: ${{ vars.SITE_URL || 'https://alanvitorb98-design.github.io/confra2026/' }}
+          allow_issue_writing: false
+          fail_action: false
+          cmd_options: '-a'
