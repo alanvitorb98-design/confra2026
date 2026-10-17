@@ -13,6 +13,10 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 3
+    # big version jumps change how the app builds; those are done by hand with the app tested
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     groups:
       minor-e-patch:
         update-types: [minor, patch]
