@@ -20,6 +20,8 @@ do $$ begin
     'o celular mais novo ficou sem aviso';
 end $$;
 
+-- someone not signed up yet: no guest behind the call
+select set_config('request.jwt.claims', '', true), set_config('request.jwt.claim.sub', '', true);
 set local role anon;
 select public.save_push('', 'https://fcm.googleapis.com/fcm/send/anonimo', 'p256dh', 'auth');
 reset role;
