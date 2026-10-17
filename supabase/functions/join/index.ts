@@ -10,8 +10,9 @@ const ORIGINS = ['https://alanvitorb98-design.github.io', 'http://localhost:4175
 // the party wifi puts many guests behind one address
 const MAX_JOINS_PER_HOUR = 600
 const MAX_GUESTS = 1500
-// wrong códigos de volta per network before it has to wait
-const MAX_BACK_MISSES_PER_HOUR = 20
+// wrong códigos de volta per network before it has to wait: the whole party can share one wifi address,
+// and 200 guesses an hour are nothing against 2 billion codes
+const MAX_BACK_MISSES_PER_HOUR = 200
 
 const cors = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin && ORIGINS.includes(origin) ? origin : ORIGINS[0],
@@ -53,12 +54,13 @@ Deno.serve(async (req) => {
       await admin.from('join_attempts').insert({ ip: tag })
       return reply(404, { error: 'código' })
     }
-    // the account's password is never kept: set a fresh one just to open a session here
+    // a one-time sign-in made and used right here (no email is sent): the guest's other phones stay signed in
     const { data: u } = await admin.auth.admin.getUserById(g.user_id)
-    const password = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
-    const { error: pwError } = await admin.auth.admin.updateUserById(g.user_id, { password })
-    if (pwError || !u.user?.email) return reply(500, { error: 'conta' })
-    const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.signInWithPassword({ email: u.user.email, password })
+    if (!u.user?.email) return reply(500, { error: 'conta' })
+    const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'magiclink', email: u.user.email })
+    const hash = link?.properties?.hashed_token
+    if (linkError || !hash) return reply(500, { error: 'conta' })
+    const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.verifyOtp({ token_hash: hash, type: 'magiclink' })
     if (signError || !signed.session) return reply(500, { error: 'sessao' })
     return reply(200, {
       guest_id: g.id,

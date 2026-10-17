@@ -61,12 +61,12 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
     QRCode.toDataURL(link, { width: 720, margin: 2, errorCorrectionLevel: 'M', color: { dark: BRAND.colors.ink, light: '#fffdf7' } }).then(setQr)
   }, [link])
 
-  const run = async (job: () => Promise<unknown>, ok: string) => {
+  const run = async <T,>(job: () => Promise<T>, ok: string | ((result: T) => string)) => {
     setBusy(true)
     setMsg(undefined)
     try {
-      await job()
-      setMsg(ok)
+      const result = await job()
+      setMsg(typeof ok === 'string' ? ok : ok(result))
     } catch {
       setMsg('Não deu certo. Confere os campos e tenta de novo.')
     } finally {
@@ -277,7 +277,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
             Preparar R2
           </button>
         )}
-        <p className="page-note">Todas as fotos que estão no app, em qualidade cheia, em arquivos .zip de até 300 MB. Melhor fazer no computador.</p>
+        <p className="page-note">Todas as fotos que estão no app, em qualidade cheia, em arquivos .zip de até 100 MB. Melhor fazer no computador.</p>
         <button
           className="btn primary wide"
           disabled={busy}
@@ -286,7 +286,11 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
               const { downloadAll } = await import('../lib/album')
               const missing = await downloadAll((done, total) => setMsg(`Baixando ${done} de ${total}…`))
               return missing
-            }, 'Pronto! Confere a pasta de downloads.')
+            }, (missing) =>
+              missing
+                ? `Baixei quase tudo, mas ${missing} ${missing === 1 ? 'foto não veio' : 'fotos não vieram'} (a internet caiu?). Baixa de novo pra pegar o que faltou.`
+                : 'Pronto! Confere a pasta de downloads.',
+            )
           }
         >
           Baixar todas as fotos
