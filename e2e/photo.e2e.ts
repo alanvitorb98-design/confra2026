@@ -101,3 +101,26 @@ test('the back button closes what is on top instead of leaving the app', async (
   await expect(page.locator('.develop-polaroid')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeAttached()
 })
+
+test('tapping "Entrar" again after a lost answer signs into the same guest', async ({ page }) => {
+  let fail = true
+  const calls = await fakeBackend(page, { join: () => (fail ? { status: 500 } : null) })
+  await page.clock.install({ time: DURING })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
+  await page.locator('.splash-go').click()
+  const terms = page.getByRole('dialog', { name: 'Combinados da festa' })
+  await terms.getByLabel('Li e topo os combinados').check()
+  await terms.getByRole('button', { name: 'Entrar' }).click()
+  await page.getByLabel('Seu nome').fill('Ana Teste')
+  await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
+  await page.getByRole('button', { name: 'Entrar na festa' }).click()
+  await expect.poll(() => calls.filter((c) => c.fn === 'join').length).toBe(1)
+  fail = false
+  await page.getByRole('button', { name: 'Entrar na festa' }).click()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+  const keys = calls.filter((c) => c.fn === 'join').map((c) => (c.body as { key?: string }).key)
+  expect(keys).toHaveLength(2)
+  expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
+  expect(keys[1]).toBe(keys[0])
+})
