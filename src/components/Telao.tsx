@@ -19,7 +19,8 @@ export function Telao({ photos, onClose }: { photos: Photo[]; onClose: () => voi
   const list = useMemo(
     () =>
       photos
-        .filter((p) => !p.status && (p.preview || p.url))
+        // the room never sees the organizers' test photos
+        .filter((p) => !p.status && !p.test && (p.preview || p.url))
         .sort((a, b) => b.takenAt.getTime() - a.takenAt.getTime())
         .slice(0, MAX),
     [photos],

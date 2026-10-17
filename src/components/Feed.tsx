@@ -1,6 +1,8 @@
 import { animate, motion, useMotionValue, useTransform, type PanInfo } from 'motion/react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { buzz } from '../lib/motion'
+import { useSessionState } from '../lib/session'
+import { storageKey } from '../brand/brand'
 import { ReactionIcon } from './Icons'
 import { REACTIONS, type Photo, type Reaction } from '../lib/types'
 import ClickSpark from './bits/ClickSpark'
@@ -16,6 +18,8 @@ interface Props {
   header?: ReactNode
   /** send again a photo whose upload failed */
   onRetry?: (id: string) => void
+  /** which wall: the photo on top and pile or grid are kept per wall, across tabs and reloads */
+  name?: string
 }
 
 const time = (d: Date) => d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
@@ -104,11 +108,11 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
 }
 
 /** Stack of Polaroids: fling the top one aside to see the next, double tap to react with 🔥. */
-export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props) {
+export function Feed({ photos, onReact, onOpen, empty, header, onRetry, name = 'feed' }: Props) {
   // follow the card on top by id, so photos arriving live from others don't move it
-  const [topId, setTopId] = useState<string>()
+  const [topId, setTopId] = useSessionState<string | undefined>(storageKey(`top.${name}`), undefined)
   const [burst, setBurst] = useState(0)
-  const [view, setView] = useState<'stack' | 'grid'>('stack')
+  const [view, setView] = useSessionState<'stack' | 'grid'>(storageKey(`view.${name}`), 'stack')
   const lastTap = useRef(0)
   const tapTimer = useRef<number>()
   const count = photos.length
@@ -118,7 +122,7 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props)
   const mineNew = newest?.status === 'sending' ? newest.id : undefined
   useEffect(() => {
     if (mineNew) setTopId(mineNew)
-  }, [mineNew])
+  }, [mineNew, setTopId])
   const index = Math.max(0, photos.findIndex((p) => p.id === topId))
   useEffect(() => () => clearTimeout(tapTimer.current), [])
 
@@ -169,7 +173,8 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry }: Props)
               onClick={() => onOpen(p)}
               initial={{ opacity: 0, y: 16, rotate: 0 }}
               animate={{ opacity: 1, y: 0, rotate: p.tilt }}
-              transition={{ delay: i * 0.04, type: 'spring', stiffness: 260, damping: 22 }}
+              // only the first rows come in one by one: with hundreds of photos the last would wait a minute
+              transition={{ delay: Math.min(i, 12) * 0.04, type: 'spring', stiffness: 260, damping: 22 }}
               whileTap={{ scale: 0.95 }}
             >
               <PolaroidFrame frame={p.frame}>

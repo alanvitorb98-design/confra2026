@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useBack } from '../lib/back'
 
 type Light = 'ok' | 'dark' | 'bright' | 'backlit'
 
@@ -43,25 +44,34 @@ export function SelfieCam({ onShot, onClose }: { onShot: (f: File) => void; onCl
   const [light, setLight] = useState<Light>()
   const [failed, setFailed] = useState(false)
 
+  useBack(true, onClose)
+
   useEffect(() => {
     let stream: MediaStream | undefined
     let timer: number | undefined
+    let alive = true
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
       .then((s) => {
         stream = s
-        const v = video.current!
-        v.srcObject = s
-        return v.play()
+        // closed before the camera answered: turn it off right away instead of leaving it on
+        if (!alive || !video.current) {
+          s.getTracks().forEach((t) => t.stop())
+          return
+        }
+        video.current.srcObject = s
+        return video.current.play()
       })
       .then(() => {
+        if (!alive) return
         timer = window.setInterval(() => {
           if (video.current && probe.current && video.current.videoWidth) setLight(measure(video.current, probe.current))
         }, 300)
       })
-      .catch(() => setFailed(true))
+      .catch(() => alive && setFailed(true))
     if (!navigator.mediaDevices) setFailed(true)
     return () => {
+      alive = false
       clearInterval(timer)
       stream?.getTracks().forEach((t) => t.stop())
     }

@@ -23,7 +23,7 @@ const standalone = window.matchMedia('(display-mode: standalone)').matches
 function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPanel' | 'onClaim'>) {
   const [asking, setAsking] = useState(false)
   const [code, setCode] = useState('')
-  const [state, setState] = useState<'idle' | 'busy' | 'wrong'>('idle')
+  const [state, setState] = useState<'idle' | 'busy' | 'wrong' | 'offline'>('idle')
   if (isAdmin) return <button className="btn primary wide" onClick={onPanel}>Painel do organizador</button>
   if (!asking) return <button className="install-skip organizer-link" onClick={() => setAsking(true)}>Sou da organização</button>
   return (
@@ -32,7 +32,7 @@ function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPan
       onSubmit={async (e) => {
         e.preventDefault()
         setState('busy')
-        setState((await onClaim(code)) ? 'idle' : 'wrong')
+        setState(await onClaim(code).then((ok) => (ok ? 'idle' : 'wrong'), () => 'offline' as const))
       }}
     >
       <label className="field">
@@ -40,6 +40,7 @@ function Organizer({ isAdmin, onPanel, onClaim }: Pick<Props, 'isAdmin' | 'onPan
         <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="ADM-XXXXXXXX" autoCapitalize="characters" autoComplete="off" />
       </label>
       {state === 'wrong' && <p className="form-error">Código não confere.</p>}
+      {state === 'offline' && <p className="form-error">Sem conexão agora. Tenta de novo em instantes.</p>}
       <button className="btn ghost wide" disabled={state === 'busy' || code.length < 6}>{state === 'busy' ? 'Conferindo…' : 'Liberar painel'}</button>
     </form>
   )

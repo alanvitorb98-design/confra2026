@@ -213,13 +213,18 @@ export async function loadEvent(code?: string) {
 
 // ---- organizer tools: every call is checked again by the database ----
 
+// no answer from the server (bad signal) is not a "no": it throws, so nobody loses the panel to the wifi
+const noAnswer = (error: { code?: string } | null) => !!error && !error.code
+
 export async function claimAdmin(code: string) {
   const { data, error } = await db.rpc('claim_admin', { p_code: code })
+  if (noAnswer(error)) throw error
   return !error && data === true
 }
 
 export async function amAdmin() {
-  const { data } = await db.rpc('is_admin')
+  const { data, error } = await db.rpc('is_admin')
+  if (noAnswer(error)) throw error
   return data === true
 }
 
@@ -665,7 +670,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
       document.removeEventListener('visibilitychange', wake)
       db.removeChannel(channel)
     }
-  }, [me, reload])
+    // the guest, not their profile: a new selfie or name must not tear the feed down and read it all again
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id, reload])
 
   const photos = useMemo<Photo[]>(() => {
     const counts = new Map<string, Record<Reaction, number>>()
