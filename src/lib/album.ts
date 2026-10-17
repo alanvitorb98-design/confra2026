@@ -4,8 +4,9 @@ import { everyRow } from './ids'
 import { BRAND } from '../brand/brand'
 
 // "Baixar todas as fotos" in the organizer panel: every photo still in the app, full quality,
-// in zip files of about 300 MB (photos are already compressed, so the zip only stores them).
-const PART = 300 * 1024 * 1024
+// in zip files of about 100 MB (photos are already compressed, so the zip only stores them). A part is held
+// in memory about three times while it is zipped, and a phone's browser tab can't hold much more than that.
+const PART = 100 * 1024 * 1024
 
 interface Row {
   id: string
@@ -35,7 +36,7 @@ function save(files: Record<string, Uint8Array>, part: number) {
 export async function downloadAll(onProgress: (done: number, total: number) => void) {
   // page by page: the server answers at most 1000 rows at a time, and the album must have every photo
   const [{ data: photos, error }, { data: people }] = await Promise.all([
-    everyRow<Row>((a, b) => db.from('photos').select('id,guest_id,kind,original_path,on_r2,created_at').is('removed_at', null).order('created_at').order('id').range(a, b)),
+    everyRow<Row>((a, b) => db.from('photos').select('id,guest_id,kind,original_path,on_r2,created_at').is('removed_at', null).eq('test', false).order('created_at').order('id').range(a, b)),
     everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b)),
   ])
   if (error || !photos) throw new Error('não consegui listar as fotos')

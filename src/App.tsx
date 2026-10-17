@@ -11,7 +11,7 @@ import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
 import { TabIcon } from './components/Icons'
 import { Shutter } from './components/Shutter'
-import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, join, leave, loadEvent, sendSelfie, useParty } from './lib/backend'
+import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, join, leave, loadEvent, onSignedOut, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
@@ -112,6 +112,13 @@ export default function App() {
   useEffect(() => {
     if (guest) hasSession().then((ok) => !ok && setGuest(null))
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // a login that ends while the app is open (it could not be renewed) goes back to the start, where the
+  // código de volta brings the same guest back with their photos still waiting to be sent
+  useEffect(() => {
+    const sub = onSignedOut(() => setGuest(null))
+    return () => sub.unsubscribe()
   }, [])
 
   useEffect(() => {

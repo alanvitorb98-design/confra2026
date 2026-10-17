@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { applyConfig, type EventConfig } from './event'
 import { stripGps } from './exif'
@@ -146,13 +146,18 @@ export async function comeBack(code: string): Promise<Guest> {
 /** This guest's código de volta (made on first ask). */
 export const myReturnCode = () => call<string>('my_return_code')
 
-/** True when this phone still has a login (it can be lost if the browser clears its data). */
+/** True when this phone still has a login (it can be lost if the browser clears its data). No signal at
+ * the venue is not a lost login: renewing it failed, but it is still kept and renews when the signal is back. */
 export async function hasSession() {
-  const { data } = await db.auth.getSession()
-  return !!data.session
+  const { data, error } = await db.auth.getSession()
+  return !!data.session || isAuthRetryableFetchError(error)
 }
 
-export const leave = () => db.auth.signOut()
+/** Signs out this phone only: the same guest on another phone (código de volta) stays signed in. */
+export const leave = () => db.auth.signOut({ scope: 'local' })
+
+/** Calls back when this phone's login ends for good (signed out, or it could no longer be renewed). */
+export const onSignedOut = (fn: () => void) => db.auth.onAuthStateChange((e) => e === 'SIGNED_OUT' && fn()).data.subscription
 
 /** A light copy (1600px) only for face matching; the face server deletes it once read. */
 async function lightCopy(file: Blob, width: number, quality?: number) {
@@ -400,6 +405,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
   const gone = useRef(new Set<string>())
   const guestsRef = useRef(guests)
   guestsRef.current = guests
+  const rowsRef = useRef(rows)
+  rowsRef.current = rows
 
   useEffect(() => {
     if (!me) return
@@ -425,13 +432,19 @@ export function useParty(me: Guest | null, peopleOn = false) {
     }
 
     const loadGuests = async () => {
-      const { data } = await db.from('guests').select('id,name')
+      const { data } = await everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b))
       if (alive && data) setGuests(new Map(data.map((x) => [x.id as string, x.name as string])))
     }
 
     const loadMissions = async () => {
-      const { data } = await db.from('missions').select('id,title,points,active,sort,target,owner,targets').order('sort')
-      if (alive && data) setMissionRows(data as MissionRow[])
+      const { data } = await everyRow<MissionRow>((a, b) =>
+        db.from('missions').select('id,title,points,active,sort,target,owner,targets').order('sort').order('id').range(a, b),
+      )
+      if (!alive || !data) return
+      setMissionRows(data)
+      // a guest who joined after this phone read the names: read them again so missions say who to find
+      const known = guestsRef.current
+      if (data.some((m) => m.targets?.some((id) => !known.has(id)))) void loadGuests()
     }
 
     // what changed is asked "since" the newest change already seen, a little before it: a change that
@@ -470,15 +483,37 @@ export function useParty(me: Guest | null, peopleOn = false) {
       })
     }
 
+    // one look at a time: on a slow network, nudges arriving meanwhile are gathered into one more look
+    // after it, never piled up as requests
+    const ALL = ['photos', 'reactions', 'photo_faces', 'missions', 'event_config']
+    let looking = false
+    let pending: Set<string> | null = null
+    const catchUp = async (what: string[] = ALL) => {
+      if (looking) {
+        pending = new Set([...(pending ?? []), ...what])
+        return
+      }
+      looking = true
+      try {
+        await lookOnce(what)
+      } finally {
+        looking = false
+      }
+      const next = pending
+      pending = null
+      if (next && alive) await catchUp([...next])
+    }
+
     // only what changed since the last look: cheap enough to run on every nudge and every return to the app
-    const catchUp = async (what: string[] = ['photos', 'reactions', 'photo_faces', 'missions', 'event_config']) => {
+    const lookOnce = async (what: string[]) => {
       if (!cursor.photos) return load()
       const jobs: Promise<unknown>[] = []
       if (what.includes('photos'))
         jobs.push(
           (async () => {
-            // oldest change first: if more than one page changed, the cursor stops at the last row read
-            const { data } = await db.from('photos').select('*').gt('updated_at', since(cursor.photos)).order('updated_at')
+            // page by page: one change can touch more than 1000 photos at once (the organizer clearing the feed)
+            const from = since(cursor.photos)
+            const { data } = await everyRow<PhotoRow>((a, b) => db.from('photos').select('*').gt('updated_at', from).order('updated_at').order('id').range(a, b))
             if (!alive || !data) return
             advance('photos', data.map((x) => x.updated_at))
             mergePhotos(data as PhotoRow[])
@@ -492,7 +527,11 @@ export function useParty(me: Guest | null, peopleOn = false) {
             advance('reactions', data.map((x) => x.created_at))
             setReactions((m) => {
               const next = new Map(m)
-              for (const r of data as ReactionRow[]) next.set(rKey(r), r)
+              for (const r of data as ReactionRow[]) {
+                // an older answer arriving late never undoes a newer tap
+                const cur = next.get(rKey(r))
+                if (!cur || (cur.created_at ?? '') <= (r.created_at ?? '')) next.set(rKey(r), r)
+              }
               return next
             })
           })(),
@@ -500,9 +539,13 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (what.includes('photo_faces') && cursor.faces)
         jobs.push(
           (async () => {
-            const { data } = await db.rpc('faces_since', { p_since: since(cursor.faces) })
+            const from = since(cursor.faces)
+            const { data } = await everyRow<{ photo_id: string; guest_id: string; shown: boolean; at: string }>((a, b) =>
+              db.rpc('faces_since', { p_since: from }).order('at').order('photo_id').order('guest_id').range(a, b),
+            )
             if (!alive || !data?.length) return
-            const list = data as { photo_id: string; guest_id: string; shown: boolean; at: string }[]
+            const list = data
+            if (list.some((f) => !guestsRef.current.has(f.guest_id))) void loadGuests()
             advance('faces', list.map((f) => f.at))
             setFaces((m) => {
               const next = new Map(m)
@@ -574,10 +617,17 @@ export function useParty(me: Guest | null, peopleOn = false) {
       if (Date.now() - lastLook < (socketUp ? 60_000 : 20_000)) return
       lastLook = Date.now()
       void catchUp()
+      resign()
     }, 5_000)
 
+    // photo links last 6 hours and a party is longer: links older than 3 hours are made again
+    const resign = () => void sign([...rowsRef.current.values()].flatMap((x) => signable(x)))
     // phones drop sockets in the background: catch up when the app comes back
-    const wake = () => document.visibilityState === 'visible' && void catchUp()
+    const wake = () => {
+      if (document.visibilityState !== 'visible') return
+      void catchUp()
+      resign()
+    }
     document.addEventListener('visibilitychange', wake)
 
     return () => {
@@ -839,7 +889,10 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setRows((m) => (m.has(row.id) ? m : new Map(m).set(row.id, { ...row, created_at: new Date().toISOString() })))
     } catch (e) {
       if (cancelled.current.has(row.id)) return
-      const problem = lastingProblem(e) ?? (l.unsafe ? 'Sem espaço no celular pra guardar: não feche o app antes de enviar.' : undefined)
+      // without a login every send is refused like a full space: that is not the photo's problem, it waits
+      // and goes once the guest is back in
+      const lasting = (await hasSession()) ? lastingProblem(e) : undefined
+      const problem = lasting ?? (l.unsafe ? 'Sem espaço no celular pra guardar: não feche o app antes de enviar.' : undefined)
       setLocal((m) => new Map(m).set(row.id, { ...l, row, status: 'failed', problem }))
     }
   }

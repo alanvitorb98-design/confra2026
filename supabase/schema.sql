@@ -1683,6 +1683,16 @@ AS $function$
 $function$
 ;
 
+create or replace function public.photos_touch() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if (to_jsonb(new) - 'rescan' - 'faces_claimed_at' - 'updated_at')
+     is distinct from (to_jsonb(old) - 'rescan' - 'faces_claimed_at' - 'updated_at') then
+    new.updated_at := clock_timestamp();
+  end if;
+  return new;
+end $$;
+
 CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.event_config FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
 
 CREATE TRIGGER guests_rostos_chamar AFTER INSERT OR UPDATE OF selfie_path, face_status ON public.guests FOR EACH ROW WHEN (((new.face_status = 'pending'::text) AND (new.selfie_path IS NOT NULL))) EXECUTE FUNCTION rostos_chamar_trg();
@@ -1701,7 +1711,7 @@ CREATE TRIGGER photos_rostos_chamar AFTER INSERT OR UPDATE OF faces_status ON pu
 
 CREATE TRIGGER photos_store BEFORE INSERT ON public.photos FOR EACH ROW EXECUTE FUNCTION photo_store();
 
-CREATE TRIGGER photos_touch BEFORE UPDATE ON public.photos FOR EACH ROW EXECUTE FUNCTION touch_updated();
+CREATE TRIGGER photos_touch BEFORE UPDATE ON public.photos FOR EACH ROW EXECUTE FUNCTION photos_touch();
 
 CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.reactions FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
 
