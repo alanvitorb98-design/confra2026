@@ -178,7 +178,17 @@ export async function sendSelfie(guestId: string, selfie: Blob) {
   if (e2) throw e2
 }
 
-export const faceOptOut = () => db.rpc('face_opt_out')
+/** Recognition off: my selfie photo is deleted (the server may not have read it yet), then its numbers. */
+export async function faceOptOut(guestId: string) {
+  const dir = `selfie/${guestId}`
+  const { data: files, error: listError } = await db.storage.from(BUCKET).list(dir)
+  if (listError) return { error: listError }
+  if (files?.length) {
+    const { error } = await db.storage.from(BUCKET).remove(files.map((f) => `${dir}/${f.name}`))
+    if (error) return { error }
+  }
+  return db.rpc('face_opt_out')
+}
 
 export type FaceProgress = { status: 'none' | 'pending' | 'ready' | 'failed'; reading: boolean; worker: boolean; ahead: number }
 
@@ -431,10 +441,17 @@ export function useParty(me: Guest | null, peopleOn = false) {
       })
     }
 
-    const loadGuests = async () => {
-      const { data } = await everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b))
-      if (alive && data) setGuests(new Map(data.map((x) => [x.id as string, x.name as string])))
-    }
+    // one read of the names at a time: many photos from new guests arriving together ask once
+    let guestsLoading: Promise<void> | null = null
+    const loadGuests = () =>
+      (guestsLoading ??= (async () => {
+        try {
+          const { data } = await everyRow<{ id: string; name: string }>((a, b) => db.from('guests').select('id,name').order('id').range(a, b))
+          if (alive && data) setGuests(new Map(data.map((x) => [x.id as string, x.name as string])))
+        } finally {
+          guestsLoading = null
+        }
+      })())
 
     const loadMissions = async () => {
       const { data } = await everyRow<MissionRow>((a, b) =>
@@ -469,7 +486,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
 
     const mergePhotos = (list: PhotoRow[]) => {
       if (!list.length) return
-      for (const row of list) if (!guestsRef.current.has(row.guest_id)) void loadGuests()
+      if (list.some((row) => !guestsRef.current.has(row.guest_id))) void loadGuests()
       void sign(list.filter((x) => !x.removed_at).flatMap((x) => signable(x)))
       setRows((m) => {
         const next = new Map(m)
@@ -486,22 +503,32 @@ export function useParty(me: Guest | null, peopleOn = false) {
     // one look at a time: on a slow network, nudges arriving meanwhile are gathered into one more look
     // after it, never piled up as requests
     const ALL = ['photos', 'reactions', 'photo_faces', 'missions', 'event_config']
+    // and at most one every 2 s, however many nudges arrive
+    const GAP_MS = 2_000
     let looking = false
+    let lastStart = 0
     let pending: Set<string> | null = null
     const catchUp = async (what: string[] = ALL) => {
-      if (looking) {
+      const wait = lastStart + GAP_MS - Date.now()
+      if (looking || wait > 0) {
+        const first = !pending
         pending = new Set([...(pending ?? []), ...what])
+        if (first && !looking) setTimeout(() => void lookPending(), wait)
         return
       }
       looking = true
+      lastStart = Date.now()
       try {
         await lookOnce(what)
       } finally {
         looking = false
       }
+      if (pending) setTimeout(() => void lookPending(), Math.max(0, lastStart + GAP_MS - Date.now()))
+    }
+    const lookPending = () => {
       const next = pending
       pending = null
-      if (next && alive) await catchUp([...next])
+      if (next && alive) return catchUp([...next])
     }
 
     // only what changed since the last look: cheap enough to run on every nudge and every return to the app
@@ -536,7 +563,9 @@ export function useParty(me: Guest | null, peopleOn = false) {
             })
           })(),
         )
-      if (what.includes('photo_faces') && cursor.faces)
+      // tags taken off are told for a day only: a phone that last saw a change longer ago reads them all again
+      const facesFresh = cursor.faces && Date.now() - Date.parse(cursor.faces) < 20 * 3600_000
+      if (what.includes('photo_faces') && facesFresh)
         jobs.push(
           (async () => {
             const from = since(cursor.faces)
@@ -559,7 +588,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
             })
           })(),
         )
-      if (what.includes('photo_faces') && !cursor.faces) jobs.push(loadFaces())
+      if (what.includes('photo_faces') && !facesFresh) jobs.push(loadFaces())
       if (what.includes('missions')) jobs.push(loadMissions())
       if (what.includes('event_config')) jobs.push(loadEvent().then((ok) => ok && alive && setEventVersion((n) => n + 1)))
       await Promise.all(jobs)
@@ -599,7 +628,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
     // the database sends a tiny nudge at most every few seconds naming what changed (never the data, so
     // a party of hundreds stays within the live limits); each phone then asks only for what is new
     const channel = db
-      .channel('live')
+      .channel('live', { config: { private: true } })
       .on('broadcast', { event: 'tick' }, ({ payload }) => void catchUp(Array.isArray(payload?.t) ? payload.t : undefined))
       .subscribe((status) => {
         // catch up on every re-subscribe so nothing is missed while the socket was down
