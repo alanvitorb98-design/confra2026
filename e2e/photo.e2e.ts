@@ -73,12 +73,31 @@ test('a photo that fails to publish stays on the phone and goes out after the ap
   // the server is back; the guest closes and opens the app
   fail = false
   await page.reload()
-  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
-  await page.locator('.splash-go').click()
+  // a returning guest opens straight into the app: no install screen or opening screen again
+  await expect(page.getByRole('button', { name: 'Continuar no navegador' })).toHaveCount(0)
+  await expect(page.locator('.splash-go')).toHaveCount(0)
   await expect
     .poll(() => calls.filter((c) => c.fn === 'send_photo' && (c.body as { p_id: string }).p_id === id).length, { timeout: 20_000 })
     .toBeGreaterThan(1)
   // the same photo id both times: the server keeps one copy
   const ids = new Set(calls.filter((c) => c.fn === 'send_photo').map((c) => (c.body as { p_id: string }).p_id))
   expect(ids.size).toBe(1)
+})
+
+test('the back button closes what is on top instead of leaving the app', async ({ page }) => {
+  await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  const feedTab = page.locator('.tabbar').getByRole('button', { name: 'Feed' })
+  // from another tab, back goes to the feed
+  await page.locator('.tabbar').getByRole('button', { name: 'Ranking' }).click()
+  await expect(feedTab).not.toHaveAttribute('aria-current', 'true')
+  await page.goBack()
+  await expect(feedTab).toHaveAttribute('aria-current', 'true')
+  // a photo not posted yet stays on screen: back must not lose it
+  await page.locator('#camera').setInputFiles(await cameraPhoto(page))
+  await expect(page.locator('.develop-polaroid')).toBeVisible({ timeout: 10_000 })
+  await page.goBack()
+  await expect(page.locator('.develop-polaroid')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeAttached()
 })

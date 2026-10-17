@@ -1,5 +1,6 @@
 import { motion } from 'motion/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useBack } from '../lib/back'
 import { loadSpots, tagSpot, untagMe, type Spot } from '../lib/backend'
 import { savePhoto, shareOrDownload } from '../lib/download'
 import { makeStory } from '../lib/story'
@@ -29,6 +30,7 @@ export function Viewer({ photo, onClose, canRemove, onRemove, me, canTag, guests
   const [status, setStatus] = useState<string>()
   const [spots, setSpots] = useState<Spot[]>([])
   const [picking, setPicking] = useState<Picking>()
+  useBack(!!picking, () => setPicking(undefined))
   const live = !!photo.url && !photo.status && !!me
 
   const refresh = useCallback(() => {
@@ -63,9 +65,12 @@ export function Viewer({ photo, onClose, canRemove, onRemove, me, canTag, guests
     e.stopPropagation()
     if (canTag) return setPicking({ spot: s })
     if (s.guestId && s.guestId === me && confirm('Tirar sua marcação dessa foto?')) {
-      await untagMe(s.id).catch(() => undefined)
-      setStatus('Marcação tirada')
-      refresh()
+      const ok = await untagMe(s.id).then(
+        () => true,
+        () => false,
+      )
+      setStatus(ok ? 'Marcação tirada' : 'Não deu pra tirar (a internet caiu?). Tenta de novo.')
+      if (ok) refresh()
     }
   }
 

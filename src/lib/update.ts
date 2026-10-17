@@ -46,3 +46,16 @@ export async function updateNow() {
   }
   location.reload()
 }
+
+// a photo being developed is never lost to an update: the screen waits until it is posted or discarded
+let held = false
+const holdListeners = new Set<(held: boolean) => void>()
+export function holdUpdate(on: boolean) {
+  held = on
+  holdListeners.forEach((fn) => fn(on))
+}
+export function onHold(fn: (held: boolean) => void) {
+  holdListeners.add(fn)
+  fn(held)
+  return () => void holdListeners.delete(fn)
+}

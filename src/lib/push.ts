@@ -54,8 +54,9 @@ export async function healPush() {
     const sub = await subscription()
     if (!sub) return
     const auth = sub.toJSON().keys?.auth
-    const { data: alive } = await db.rpc('push_alive', { p_endpoint: sub.endpoint, p_auth: auth })
-    if (alive) return
+    const { data: alive, error } = await db.rpc('push_alive', { p_endpoint: sub.endpoint, p_auth: auth })
+    // no answer (bad signal) is not "dropped": signing up again on every weak start piled up subscriptions
+    if (alive || error) return
     await sub.unsubscribe()
     const reg = await navigator.serviceWorker.ready
     const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { APP_VERSION, latestVersion, updateNow } from '../lib/update'
+import { APP_VERSION, latestVersion, onHold, updateNow } from '../lib/update'
 
 const CHECK_MS = 5 * 60_000
 
@@ -10,6 +10,8 @@ const CHECK_MS = 5 * 60_000
 export function UpdateGate() {
   const [latest, setLatest] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [held, setHeld] = useState(false)
+  useEffect(() => onHold(setHeld), [])
 
   useEffect(() => {
     const check = () => latestVersion().then((v) => v && setLatest(v))
@@ -23,7 +25,7 @@ export function UpdateGate() {
     }
   }, [])
 
-  if (!latest || latest === APP_VERSION) return null
+  if (!latest || latest === APP_VERSION || held) return null
   return (
     <div className="update-gate" role="alertdialog" aria-modal="true" aria-label="Atualizar o app">
       <div className="update-card">

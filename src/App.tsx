@@ -20,6 +20,10 @@ import { PhaseBar } from './components/PhaseBar'
 import { LOOK_CLOSES, clock, lookOpen, phaseAt, setTestClock, testClock, useNow } from './lib/event'
 import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
+import { useBack } from './lib/back'
+import { useSessionState } from './lib/session'
+import { holdUpdate } from './lib/update'
+import { termsAccepted } from './lib/terms'
 import { Splash } from './components/Splash'
 import { Logo } from './components/Logo'
 import { PartyScene } from './brand/PartyScene'
@@ -29,6 +33,15 @@ type Tab = 'feed' | 'missions' | 'ranking' | 'me'
 
 const GUEST_KEY = storageKey('guest')
 const ORG_KEY = storageKey('org')
+// "Continuar no navegador" is asked once, not on every visit
+const BROWSER_KEY = storageKey('browser')
+const browserChosen = () => {
+  try {
+    return localStorage.getItem(BROWSER_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 
 function loadGuest(): Guest | null {
   try {
@@ -43,15 +56,17 @@ function loadGuest(): Guest | null {
 
 export default function App() {
   const [guest, setGuest] = useState<Guest | null>(loadGuest)
-  const [tab, setTab] = useState<Tab>('feed')
-  const [wall, setWall] = useState<Wall>('party')
+  // where the guest was survives a reload or the phone reopening the app
+  const [tab, setTab] = useSessionState<Tab>(storageKey('tab'), 'feed')
+  const [wall, setWall] = useSessionState<Wall>(storageKey('wall'), 'party')
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const [code] = useState(eventCode)
-  const [intro, setIntro] = useState(true)
-  const [gate, setGate] = useState(() => !isInstalled())
+  // the opening screen is for the first visit: once the terms are accepted the app opens straight in
+  const [intro, setIntro] = useState(() => !termsAccepted())
+  const [gate, setGate] = useState(() => !isInstalled() && !browserChosen())
   const t = useNow()
   const phase = phaseAt(t)
   // an organizer code typed on the countdown lets this phone in early (checked by the server on sign-in)
@@ -73,6 +88,16 @@ export default function App() {
   // which mission the photo being taken is for
   const [missionShot, setMissionShot] = useState<string>()
 
+  // the back button closes what is on top, and from another tab goes to the feed, before leaving the app
+  useBack(!!open, () => setOpen(null))
+  // a photo not posted yet only goes away with "Descartar": back must not lose it
+  useBack(!!shot, () => false)
+  // nor an app update
+  useEffect(() => holdUpdate(!!shot), [shot])
+  useBack(panel, () => setPanel(false))
+  useBack(telao, () => setTelao(false))
+  useBack(tab !== 'feed', () => setTab('feed'))
+
   // the organizer's dates and place
   // daily reminders: re-register this phone if the push service dropped it
   useEffect(() => {
@@ -85,19 +110,31 @@ export default function App() {
 
   useEffect(() => {
     if (!guest) return setIsAdmin(false)
-    amAdmin().then(async (yes) => {
-      if (!yes && orgCode) yes = await claimAdmin(orgCode).catch(() => false)
-      setIsAdmin(yes)
-      // a wrong organizer code sends this phone back to the countdown
-      if (!yes && orgCode) forgetOrg()
-      // the test clock is for organizers: anyone else stays on the real time
-      if (!yes && testClock) {
-        setTestClock(null)
-        location.reload()
-      }
-    })
+    let alive = true
+    let retry: number | undefined
+    const check = () =>
+      amAdmin()
+        .then(async (yes) => {
+          if (!yes && orgCode) yes = await claimAdmin(orgCode)
+          if (!alive) return
+          setIsAdmin(yes)
+          // a wrong organizer code sends this phone back to the countdown
+          if (!yes && orgCode) forgetOrg()
+          // the test clock is for organizers: anyone else stays on the real time
+          if (!yes && testClock) {
+            setTestClock(null)
+            location.reload()
+          }
+        })
+        // no answer (bad signal): nothing changes, and it asks again shortly
+        .catch(() => alive && (retry = window.setTimeout(check, 15_000)))
+    check()
+    return () => {
+      alive = false
+      clearTimeout(retry)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [guest, orgCode])
+  }, [guest?.id, orgCode])
 
   const forgetOrg = () => {
     try {
@@ -133,7 +170,19 @@ export default function App() {
     }
   }, [guest])
 
-  if (gate) return <Install onSkip={() => setGate(false)} />
+  if (gate)
+    return (
+      <Install
+        onSkip={() => {
+          try {
+            localStorage.setItem(BROWSER_KEY, '1')
+          } catch {
+            /* private mode: asked again next visit */
+          }
+          setGate(false)
+        }}
+      />
+    )
   if (intro)
     return (
       <AnimatePresence>
@@ -242,6 +291,7 @@ export default function App() {
         {tab === 'feed' && (
           <Feed
             key={showWall}
+            name={showWall}
             photos={wallPhotos}
             onReact={party.react}
             onRetry={party.retry}
