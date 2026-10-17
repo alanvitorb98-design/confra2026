@@ -24,7 +24,7 @@ Deno.serve(async (req) => {
   const secret = req.headers.get('x-face-secret') ?? ''
   const { data: s } = await db.from('event_secret').select('face_hash').single()
   if (!s?.face_hash || secret.length < 32 || (await sha256(secret)) !== s.face_hash) return json(401, { error: 'senha' })
-  await db.from('event_config').update({ face_worker_seen: new Date().toISOString() }).eq('id', true)
+  // (the server's heartbeat is face_claim's rostos_vivo: writing event_config made every phone re-read the event)
 
   const op = new URL(req.url).searchParams.get('op')
 
@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
     for (const g of selfies) {
       const url = await link(g.selfie_path)
       if (url) jobs.push({ kind: 'selfie', id: g.id, url })
-      else await db.from('guests').update({ face_status: 'failed' }).eq('id', g.id)
+      else await db.from('guests').update({ face_status: 'failed' }).eq('id', g.id).eq('face_opt_in', true)
     }
     for (const p of photos) {
       const url = (await link(analysisPath(p.original_path))) ?? (await link(p.preview_path))
@@ -78,7 +78,8 @@ Deno.serve(async (req) => {
 
   if (op === 'fail' && req.method === 'POST') {
     const body = (await req.json()) as { kind: string; id: string }
-    if (body.kind === 'selfie') await db.from('guests').update({ face_status: 'failed' }).eq('id', body.id)
+    // a guest who turned recognition off meanwhile stays off (their selfie was deleted, hence the failure)
+    if (body.kind === 'selfie') await db.from('guests').update({ face_status: 'failed' }).eq('id', body.id).eq('face_opt_in', true)
     if (body.kind === 'photo') await db.from('photos').update({ faces_status: 'failed' }).eq('id', body.id)
     return json(200, { ok: true })
   }

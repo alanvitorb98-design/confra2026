@@ -402,22 +402,17 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.admin_face_stats()
- RETURNS jsonb
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+create or replace function public.admin_face_stats() returns jsonb
+language plpgsql security definer set search_path = '' as $$
 begin
   if not public.is_admin() then raise exception 'só organizador'; end if;
   return jsonb_build_object(
     'has_secret', (select face_hash is not null from public.event_secret),
-    'worker_seen', (select face_worker_seen from public.event_config),
+    'worker_seen', greatest((select face_worker_seen from public.event_config), (select seen_at from public.rostos_vivo where id = 1)),
     'selfies', (select count(*) from public.guests where face_status = 'ready'),
     'pending', (select count(*) from public.photos where (faces_status = 'pending' or rescan) and kind = 'party' and removed_at is null)
   );
-end $function$
-;
+end $$;
 
 CREATE OR REPLACE FUNCTION public.admin_mission(p_id uuid, p_title text, p_points integer, p_active boolean, p_sort integer, p_target text)
  RETURNS uuid
@@ -840,14 +835,11 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.face_save_selfie(p_guest uuid, p_embedding jsonb)
- RETURNS integer
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+create or replace function public.face_save_selfie(p_guest uuid, p_embedding jsonb) returns integer
+language plpgsql security definer set search_path = '' as $$
 declare n int;
 begin
+  if not exists (select 1 from public.guests where id = p_guest and face_opt_in) then return 0; end if;
   if p_embedding is null or jsonb_typeof(p_embedding) <> 'array' then
     update public.guests set face_status = 'failed' where id = p_guest;
     return 0;
@@ -860,8 +852,7 @@ begin
   get diagnostics n = row_count;
   perform public.face_promote_rescan();
   return n;
-end $function$
-;
+end $$;
 
 CREATE OR REPLACE FUNCTION public.face_work_waiting()
  RETURNS boolean
@@ -875,17 +866,14 @@ AS $function$
 $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.faces_since(p_since timestamp with time zone)
- RETURNS TABLE(photo_id uuid, guest_id uuid, shown boolean, at timestamp with time zone)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+create or replace function public.faces_since(p_since timestamptz)
+returns table(photo_id uuid, guest_id uuid, shown boolean, at timestamptz)
+language sql stable security definer set search_path = '' as $$
   select f.photo_id, f.guest_id, f.score > 0, f.updated_at
   from public.photo_faces f
   where (select public.is_guest()) and f.updated_at > p_since
-$function$
-;
+    and (f.score > 0 or f.updated_at > now() - interval '1 day')
+$$;
 
 CREATE OR REPLACE FUNCTION public.faces_sync(p_photo uuid, p_guest uuid)
  RETURNS void
@@ -973,12 +961,8 @@ begin
 end $function$
 ;
 
-CREATE OR REPLACE FUNCTION public.live_flush()
- RETURNS void
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
+create or replace function public.live_flush() returns void
+language plpgsql security definer set search_path = '' as $$
 declare r record; t text[] := '{}';
 begin
   if not pg_try_advisory_xact_lock(4207) then return; end if;
@@ -987,10 +971,18 @@ begin
     update public.live_dirty set sent_at = r.changed_at where tbl = r.tbl;
   end loop;
   if cardinality(t) > 0 then
-    perform realtime.send(jsonb_build_object('t', t), 'tick', 'live', false);
+    perform realtime.send(jsonb_build_object('t', t), 'tick', 'live', true);
   end if;
-end $function$
-;
+end $$;
+
+create or replace function public.live_mark_photos() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from n join o using (id) where n.updated_at is distinct from o.updated_at) then
+    update public.live_dirty set changed_at = clock_timestamp() where tbl = 'photos';
+  end if;
+  return null;
+end $$;
 
 CREATE OR REPLACE FUNCTION public.live_mark()
  RETURNS trigger
@@ -1686,6 +1678,12 @@ $function$
 create or replace function public.photos_touch() returns trigger
 language plpgsql set search_path = '' as $$
 begin
+  if new.removed_at is not null and old.removed_at is null then
+    new.caption := '';
+    new.preview_url := null;
+    new.thumb_url := null;
+    new.links_until := null;
+  end if;
   if (to_jsonb(new) - 'rescan' - 'faces_claimed_at' - 'updated_at')
      is distinct from (to_jsonb(old) - 'rescan' - 'faces_claimed_at' - 'updated_at') then
     new.updated_at := clock_timestamp();
@@ -1703,7 +1701,9 @@ CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.photo_faces 
 
 CREATE TRIGGER photo_faces_touch BEFORE UPDATE ON public.photo_faces FOR EACH ROW EXECUTE FUNCTION touch_updated();
 
-CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.photos FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
+CREATE TRIGGER live_mark AFTER INSERT OR DELETE ON public.photos FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
+
+CREATE TRIGGER live_mark_update AFTER UPDATE ON public.photos REFERENCING OLD TABLE AS o NEW TABLE AS n FOR EACH STATEMENT EXECUTE FUNCTION live_mark_photos();
 
 CREATE TRIGGER photos_mission_verdict BEFORE INSERT OR UPDATE OF faces_status, mission_id ON public.photos FOR EACH ROW EXECUTE FUNCTION mission_verdict();
 
@@ -1776,6 +1776,12 @@ create policy "read reactions" on public.reactions as permissive for select to a
 create policy "guests see the photos" on storage.objects as permissive for select to authenticated using (((bucket_id = 'fotos'::text) AND ( SELECT is_guest() AS is_guest) AND (((storage.foldername(name))[2] = (( SELECT my_guest() AS my_guest))::text) OR (((storage.foldername(name))[1] = ANY (ARRAY['party'::text, 'look'::text])) AND (EXISTS ( SELECT 1
    FROM photos p
   WHERE (((p.id)::text = "left"(storage.filename(objects.name), 36)) AND (p.removed_at IS NULL) AND ((NOT p.test) OR ( SELECT is_admin() AS is_admin)))))))));
+
+create policy "guests delete their own selfie" on storage.objects for delete to authenticated
+using (bucket_id = 'fotos' and (storage.foldername(name))[1] = 'selfie' and (storage.foldername(name))[2] = (select public.my_guest())::text);
+
+create policy "guests hear the live nudges" on realtime.messages for select to authenticated
+using ((select realtime.topic()) = 'live' and extension = 'broadcast' and (select public.is_guest()));
 
 create policy "upload into a guest folder" on storage.objects as permissive for insert to authenticated with check (((bucket_id = 'fotos'::text) AND ((storage.foldername(name))[1] = ANY (ARRAY['party'::text, 'look'::text, 'selfie'::text])) AND ((storage.foldername(name))[2] = (( SELECT my_guest() AS my_guest))::text) AND ( SELECT upload_quota_ok() AS upload_quota_ok)));
 
@@ -1996,6 +2002,8 @@ revoke all on function public.join_party(p_token text, p_name text, p_instagram 
 revoke all on function public.live_flush() from public, anon, authenticated;
 
 revoke all on function public.live_mark() from public, anon, authenticated;
+
+revoke all on function public.live_mark_photos() from public, anon, authenticated;
 
 revoke all on function public.log_client_error(p_note text, p_ua text) from public, anon, authenticated;
 

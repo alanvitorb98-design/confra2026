@@ -10,9 +10,11 @@ const ORIGINS = ['https://alanvitorb98-design.github.io', 'http://localhost:4175
 // the party wifi puts many guests behind one address
 const MAX_JOINS_PER_HOUR = 600
 const MAX_GUESTS = 1500
-// wrong códigos de volta per network before it has to wait: the whole party can share one wifi address,
-// and 200 guesses an hour are nothing against 2 billion codes
-const MAX_BACK_MISSES_PER_HOUR = 200
+// códigos de volta tried per network before it has to wait (the whole party can share one wifi address),
+// and by everyone together: guessers spread over many networks still get about 2,000 tries an hour against
+// 190 million codes
+const MAX_BACK_TRIES_PER_HOUR = 200
+const MAX_BACK_TRIES_TOTAL = 2000
 
 const cors = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin && ORIGINS.includes(origin) ? origin : ORIGINS[0],
@@ -43,17 +45,19 @@ Deno.serve(async (req) => {
   // back into an existing account with its código de volta (another phone, browser, or cleared data)
   if (typeof body.back === 'string') {
     const tag = `volta:${ip}`
-    const { count: misses } = await admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', tag).gte('at', since)
-    if ((misses ?? 0) >= MAX_BACK_MISSES_PER_HOUR) return reply(429, { error: 'muitas tentativas' })
+    // each try is written down before counting: tries sent all at once each count the others
+    await admin.from('join_attempts').insert({ ip: tag })
+    const [{ count: tries }, { count: all }] = await Promise.all([
+      admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', tag).gte('at', since),
+      admin.from('join_attempts').select('*', { count: 'exact', head: true }).like('ip', 'volta:%').gte('at', since),
+    ])
+    if ((tries ?? 0) > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL) return reply(429, { error: 'muitas tentativas' })
     const code = body.back.toUpperCase().replace(/[^A-Z0-9]/g, '')
     const { data: hit } = code.length === 6 ? await admin.from('guest_codes').select('guest_id').eq('code', code).maybeSingle() : { data: null }
     const { data: g } = hit
       ? await admin.from('guests').select('id, name, instagram, face_opt_in, user_id').eq('id', hit.guest_id).maybeSingle()
       : { data: null }
-    if (!g?.user_id) {
-      await admin.from('join_attempts').insert({ ip: tag })
-      return reply(404, { error: 'código' })
-    }
+    if (!g?.user_id) return reply(404, { error: 'código' })
     // a one-time sign-in made and used right here (no email is sent): the guest's other phones stay signed in
     const { data: u } = await admin.auth.admin.getUserById(g.user_id)
     if (!u.user?.email) return reply(500, { error: 'conta' })
@@ -72,8 +76,10 @@ Deno.serve(async (req) => {
     })
   }
 
+  // written down before counting, like the códigos de volta
+  await admin.from('join_attempts').insert({ ip })
   const { count } = await admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', ip).gte('at', since)
-  if ((count ?? 0) >= MAX_JOINS_PER_HOUR) return reply(429, { error: 'muitas tentativas' })
+  if ((count ?? 0) > MAX_JOINS_PER_HOUR) return reply(429, { error: 'muitas tentativas' })
   const { count: guests } = await admin.from('guests').select('*', { count: 'exact', head: true })
   if ((guests ?? 0) >= MAX_GUESTS) return reply(429, { error: 'lotado' })
 
@@ -83,8 +89,6 @@ Deno.serve(async (req) => {
   if (instagram && !/^[A-Za-z0-9._]{1,30}$/.test(instagram)) return reply(400, { error: 'instagram' })
   // which version of the terms the guest accepted on the opening screen (kept as proof of consent)
   const terms = typeof body.terms === 'string' && /^[\w.-]{1,20}$/.test(body.terms) ? body.terms : null
-
-  await admin.from('join_attempts').insert({ ip })
 
   const email = `${crypto.randomUUID()}@convidados.confra`
   const password = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')

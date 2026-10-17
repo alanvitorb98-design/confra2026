@@ -19,6 +19,7 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
   const [busy, setBusy] = useState(false)
   const [sending, setSending] = useState(false)
   const [cam, setCam] = useState(false)
+  const [offFailed, setOffFailed] = useState(false)
   const [prog, setProg] = useState<FaceProgress>()
   const [since, setSince] = useState(() => Date.now())
   const [now, setNow] = useState(() => Date.now())
@@ -111,16 +112,20 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
             disabled={busy}
             onClick={async () => {
               setBusy(true)
-              await faceOptOut()
+              setOffFailed(false)
+              const { error } = await faceOptOut(guest.id)
+              setBusy(false)
+              // off only when the server says so: offline it stays on, and says why
+              if (error) return setOffFailed(true)
               onChange({ ...guest, faceOptIn: false, selfieUrl: undefined })
               setStatus('none')
-              setBusy(false)
             }}
           >
             Desligar
           </button>
         )}
       </div>
+      {offFailed && <p className="form-error" role="alert">Não deu pra desligar (a internet caiu?). Tenta de novo.</p>}
       {cam && <SelfieCam onShot={pick} onClose={() => setCam(false)} />}
     </div>
   )
