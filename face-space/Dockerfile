@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.14-rc-alpine3.19
 
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential g++ && rm -rf /var/lib/apt/lists/*
 
