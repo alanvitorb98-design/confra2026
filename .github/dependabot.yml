@@ -1,0 +1,18 @@
+# keeps the pinned action commits and npm packages current, one grouped PR a week each
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ['*']
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    groups:
+      minor-e-patch:
+        update-types: [minor, patch]
