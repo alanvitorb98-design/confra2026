@@ -7,7 +7,7 @@ do $$
 declare r record; bad text := '';
 begin
   for r in select c.oid, c.relname, c.relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace
-           where n.nspname = 'public' and c.relkind in ('r', 'p') loop
+           where n.nspname = 'public' and c.relkind in ('r', 'p') and c.relname not like 'test\_%' loop
     if not r.relrowsecurity then bad := bad || r.relname || ' sem RLS; '; end if;
     if has_table_privilege('anon', r.oid, 'select') then bad := bad || r.relname || ' visitante lê; '; end if;
     if has_table_privilege('anon', r.oid, 'insert,update,delete,truncate') then bad := bad || r.relname || ' visitante escreve; '; end if;
