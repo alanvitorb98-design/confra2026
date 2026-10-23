@@ -9,7 +9,15 @@ import { BRAND } from '../brand/brand'
 
 type NewGuest = Omit<Guest, 'id'>
 
-export function Welcome({ code, onEnter, onBack }: { code: string; onEnter: (code: string, g: NewGuest) => Promise<void>; onBack: (code: string) => Promise<void> }) {
+interface Props {
+  code: string
+  onEnter: (code: string, g: NewGuest) => Promise<void>
+  onBack: (code: string) => Promise<void>
+  /** back to the opening screen (date, place, map), while the party has not started */
+  onStart?: () => void
+}
+
+export function Welcome({ code, onEnter, onBack, onStart }: Props) {
   const [back, setBack] = useState(false)
   const [name, setName] = useState('')
   const [instagram, setInstagram] = useState('')
@@ -86,6 +94,7 @@ export function Welcome({ code, onEnter, onBack }: { code: string; onEnter: (cod
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="btn primary wide" disabled={!ready || busy}>{busy ? 'Entrando…' : 'Entrar na festa'}</button>
         <button type="button" className="install-skip back-link" onClick={() => setBack(true)}>Já me cadastrei em outro celular</button>
+        {onStart && <button type="button" className="install-skip back-link" onClick={onStart}>Voltar pro início (data e local)</button>}
       </form>
       )}
       {cam && <SelfieCam onShot={pickSelfie} onClose={() => setCam(false)} />}
