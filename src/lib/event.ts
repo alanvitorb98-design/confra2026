@@ -12,6 +12,8 @@ export const EVENT = {
   mapsUrl: '',
   lat: null as number | null,
   lng: null as number | null,
+  /** the organizer let only invited guests sign up (personal invitation or the event code) */
+  inviteOnly: false,
 }
 
 /** The app opens one day before the party */
@@ -33,6 +35,7 @@ export interface EventConfig {
   maps_url: string | null
   lat?: number | null
   lng?: number | null
+  invite_only?: boolean
 }
 
 const CONFIG_KEY = storageKey('event')
@@ -44,6 +47,7 @@ export function applyConfig(c: EventConfig, cache = true) {
   APP_OPENS = date(c.app_opens, APP_OPENS)
   LOOK_OPENS = date(c.look_opens, LOOK_OPENS)
   LOOK_CLOSES = date(c.look_closes, LOOK_CLOSES)
+  EVENT.inviteOnly = !!c.invite_only
   // the place only comes with the code: never forget it because a later answer came without
   if (c.place) {
     EVENT.place = c.place

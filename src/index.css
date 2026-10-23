@@ -653,6 +653,25 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
 .back-link { display: block; margin: 4px auto 0; }
 .back-help { margin: 0; font-size: 15px; line-height: 1.45; }
 .back-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 24px !important; letter-spacing: .3em; text-align: center; }
+.back-help.small { font-size: 13px; text-align: center; opacity: .8; }
+
+/* convites */
+.door-wait { margin: 24px 0; text-align: center; font-size: 15px; color: var(--ink-2); }
+.door-code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; text-transform: uppercase; letter-spacing: .12em; }
+.invite-name { margin: 0; font-size: 14px; color: var(--ink-2); text-align: center; }
+.invite-name b { color: var(--ink); }
+.who-list { display: grid; gap: 8px; }
+.same-name { display: grid; gap: 10px; padding: 16px; border-radius: 16px; background: var(--paper-2, #f6e8bd); }
+.same-name p { margin: 0; font-size: 15px; line-height: 1.4; }
+.invite-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.invite-item { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: #fffdf6; }
+.invite-item.off { opacity: .55; }
+.invite-item b { font-size: 15px; }
+.invite-item small { font-size: 13px; color: var(--muted); }
+.admin-input-big { width: 100%; min-height: 110px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font: inherit; resize: vertical; }
+.return-qr { display: grid; justify-items: center; gap: 8px; padding: 12px; border-radius: 16px; background: #fffdf7; }
+.return-qr img { width: min(260px, 70vw); height: auto; }
+.return-qr code { font: 700 26px ui-monospace, 'SF Mono', Menlo, monospace; letter-spacing: .2em; color: var(--ink); }
 .return-code { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px; border-radius: 16px; background: var(--paper-2, #f6e8bd); }
 .return-code b { display: block; margin-bottom: 4px; }
 .return-code p { margin: 0; font-size: 13px; line-height: 1.4; opacity: .8; }

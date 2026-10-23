@@ -43,7 +43,8 @@ create table public.event_config (
   gen_missions boolean default true not null,
   gen_min_guests integer default 15 not null,
   gen_max_people integer default 4 not null,
-  gen_swaps integer default 3 not null
+  gen_swaps integer default 3 not null,
+  invite_only boolean default false not null
 );
 
 create table public.event_secret (
@@ -95,7 +96,17 @@ create table public.guests (
   face_status text default 'none'::text not null,
   terms_at timestamp with time zone,
   terms_version text,
-  face_claimed_at timestamp with time zone
+  face_claimed_at timestamp with time zone,
+  invite_id uuid
+);
+
+create table public.invites (
+  id uuid default gen_random_uuid() not null,
+  token text not null,
+  label text not null,
+  seats integer default 1 not null,
+  created_at timestamp with time zone default now() not null,
+  revoked_at timestamp with time zone
 );
 
 create table public.join_attempts (
@@ -251,6 +262,14 @@ alter table public.guests add constraint guests_name_check CHECK (((char_length(
 
 alter table public.guests add constraint guests_pkey PRIMARY KEY (id);
 
+alter table public.invites add constraint invites_label_check CHECK (((char_length(label) >= 1) AND (char_length(label) <= 60)));
+
+alter table public.invites add constraint invites_pkey PRIMARY KEY (id);
+
+alter table public.invites add constraint invites_seats_check CHECK (((seats >= 1) AND (seats <= 20)));
+
+alter table public.invites add constraint invites_token_key UNIQUE (token);
+
 alter table public.guests add constraint guests_token_hash_key UNIQUE (token_hash);
 
 alter table public.guests add constraint guests_user_id_key UNIQUE (user_id);
@@ -297,6 +316,8 @@ alter table public.rostos_vivo add constraint rostos_vivo_pkey PRIMARY KEY (id);
 
 alter table public.saude_estado add constraint saude_estado_pkey PRIMARY KEY (item);
 
+alter table public.guests add constraint guests_invite_id_fkey FOREIGN KEY (invite_id) REFERENCES invites(id) ON DELETE SET NULL;
+
 alter table public.face_extra add constraint face_extra_guest_id_fkey FOREIGN KEY (guest_id) REFERENCES guests(id) ON DELETE CASCADE;
 
 alter table public.face_extra add constraint face_extra_photo_id_fkey FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE;
@@ -336,6 +357,8 @@ alter table public.reactions add constraint reactions_photo_id_fkey FOREIGN KEY 
 CREATE INDEX admin_attempts_user_at ON public.admin_attempts USING btree (user_id, at);
 
 CREATE INDEX face_extra_photo ON public.face_extra USING btree (photo_id);
+
+CREATE INDEX guests_invite_id_idx ON public.guests USING btree (invite_id) WHERE (invite_id IS NOT NULL);
 
 CREATE INDEX guests_face_queue ON public.guests USING btree (created_at) WHERE ((face_status = 'pending'::text) AND (selfie_path IS NOT NULL));
 
@@ -414,6 +437,99 @@ begin
   );
 end $$;
 
+CREATE OR REPLACE FUNCTION public.admin_find_guests(p_q text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare q text := lower(extensions.unaccent(trim(coalesce(p_q, ''))));
+begin
+  if not public.is_admin() then raise exception 'só organizador'; end if;
+  if char_length(q) < 2 then return '[]'::jsonb; end if;
+  return coalesce((
+    select jsonb_agg(x order by x->>'name') from (
+      select jsonb_build_object(
+        'id', g.id, 'name', g.name, 'instagram', g.instagram, 'created_at', g.created_at,
+        'invite', (select i.label from public.invites i where i.id = g.invite_id),
+        'photos', (select count(*) from public.photos p where p.guest_id = g.id and p.removed_at is null)
+      ) x
+      from public.guests g
+      where lower(extensions.unaccent(g.name)) like '%' || q || '%'
+         or lower(coalesce(g.instagram, '')) like '%' || q || '%'
+      order by g.name limit 20
+    ) s
+  ), '[]'::jsonb);
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.admin_invite_set(p_id uuid, p jsonb)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if not public.is_admin() then raise exception 'só organizador'; end if;
+  update public.invites set
+    label = coalesce(nullif(left(trim(p->>'label'), 60), ''), label),
+    seats = case when p ? 'seats' then least(greatest((p->>'seats')::int, 1), 20) else seats end,
+    revoked_at = case when p ? 'revoked' then (case when (p->>'revoked')::boolean then coalesce(revoked_at, now()) end) else revoked_at end
+  where id = p_id;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.admin_invites()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if not public.is_admin() then raise exception 'só organizador'; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', i.id, 'token', i.token, 'label', i.label, 'seats', i.seats, 'revoked', i.revoked_at is not null,
+      'people', coalesce((select jsonb_agg(g.name order by g.created_at) from public.guests g where g.invite_id = i.id), '[]'::jsonb)
+    ) order by i.created_at, i.label)
+    from public.invites i
+  ), '[]'::jsonb);
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.admin_invites_add(p_lines text)
+ RETURNS integer
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare line text; m text[]; lbl text; n int; made int := 0; t text; abc constant text := 'ACDEFGHJKMNPQRTUVWXY3479';
+begin
+  if not public.is_admin() then raise exception 'só organizador'; end if;
+  if (select count(*) from regexp_split_to_table(coalesce(p_lines, ''), E'\n') x where trim(x) <> '') > 500 then
+    raise exception 'no máximo 500 de uma vez';
+  end if;
+  for line in select trim(x) from regexp_split_to_table(coalesce(p_lines, ''), E'\n') x where trim(x) <> '' loop
+    m := regexp_match(line, '^(.*?)\s*[;\t]\s*(\d{1,2})$');
+    lbl := left(trim(coalesce(m[1], line)), 60);
+    n := least(greatest(coalesce(m[2]::int, 1), 1), 20);
+    continue when lbl = '';
+    if (select count(*) from public.invites) >= 3000 then raise exception 'limite de convites'; end if;
+    loop
+      select string_agg(substr(abc, 1 + get_byte(b, i) % length(abc), 1), '' order by i) into t
+      from (select extensions.gen_random_bytes(10) as b) r, generate_series(0, 9) i;
+      begin
+        insert into public.invites (token, label, seats) values (t, lbl, n);
+        exit;
+      exception when unique_violation then null;
+      end;
+    end loop;
+    made := made + 1;
+  end loop;
+  return made;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.admin_mission(p_id uuid, p_title text, p_points integer, p_active boolean, p_sort integer, p_target text)
  RETURNS uuid
  LANGUAGE plpgsql
@@ -451,6 +567,19 @@ begin
     update public.missions set title = trim(p_title), points = p_points, active = coalesce(p_active, active), sort = coalesce(p_sort, sort) where id = p_id returning id into v;
   end if;
   return v;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.admin_return_code(p_guest uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if not public.is_admin() then raise exception 'só organizador'; end if;
+  if not exists (select 1 from public.guests where id = p_guest) then raise exception 'convidado não encontrado'; end if;
+  return public.return_code_for(p_guest);
 end $function$
 ;
 
@@ -518,6 +647,7 @@ begin
     lat = case when p ? 'lat' then (p->>'lat')::double precision else lat end,
     lng = case when p ? 'lng' then (p->>'lng')::double precision else lng end,
     test_mode = coalesce((p->>'test_mode')::boolean, test_mode),
+    invite_only = coalesce((p->>'invite_only')::boolean, invite_only),
     gen_missions = coalesce((p->>'gen_missions')::boolean, gen_missions),
     -- greatest/least skip nulls, so a missing field must keep the old value explicitly
     gen_max_people = case when p ? 'gen_max_people' then least(greatest((p->>'gen_max_people')::int, 1), 6) else gen_max_people end,
@@ -598,7 +728,8 @@ begin
   return jsonb_build_object(
     'app_opens', c.app_opens, 'party_starts', c.party_starts, 'party_ends', c.party_ends,
     'look_opens', c.look_opens, 'look_closes', c.look_closes, 'test_mode', c.test_mode,
-    'place', c.place, 'address', c.address, 'maps_url', c.maps_url, 'lat', c.lat, 'lng', c.lng
+    'place', c.place, 'address', c.address, 'maps_url', c.maps_url, 'lat', c.lat, 'lng', c.lng,
+    'invite_only', c.invite_only
   );
 end $function$
 ;
@@ -924,6 +1055,35 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.guest_name_taken(p_name text)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select exists (
+    select 1 from public.guests
+    where lower(extensions.unaccent(regexp_replace(trim(name), '\s+', ' ', 'g')))
+        = lower(extensions.unaccent(regexp_replace(trim(coalesce(p_name, '')), '\s+', ' ', 'g')))
+  );
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.invite_peek(p_token text)
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+  select jsonb_build_object(
+    'id', i.id, 'label', i.label, 'seats', i.seats, 'revoked', i.revoked_at is not null,
+    'people', coalesce((select jsonb_agg(jsonb_build_object('id', g.id, 'name', g.name) order by g.created_at)
+                        from public.guests g where g.invite_id = i.id), '[]'::jsonb)
+  )
+  from public.invites i where i.token = upper(regexp_replace(coalesce(p_token, ''), '[^A-Za-z0-9]', '', 'g'));
+$function$
+;
+
 CREATE OR REPLACE FUNCTION public.is_admin()
  RETURNS boolean
  LANGUAGE sql
@@ -1078,21 +1238,10 @@ CREATE OR REPLACE FUNCTION public.my_return_code()
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-declare g uuid := public.my_guest(); c text; abc constant text := 'ACDEFGHJKMNPQRTUVWXY3479';
+declare g uuid := public.my_guest();
 begin
   if g is null then raise exception 'faça login'; end if;
-  select code into c from public.guest_codes where guest_id = g;
-  while c is null loop
-    select string_agg(substr(abc, 1 + get_byte(b, i) % length(abc), 1), '' order by i) into c
-    from (select extensions.gen_random_bytes(6) as b) r, generate_series(0, 5) i;
-    begin
-      insert into public.guest_codes (guest_id, code) values (g, c);
-    exception when unique_violation then
-      c := null;
-      select code into c from public.guest_codes where guest_id = g;
-    end;
-  end loop;
-  return c;
+  return public.return_code_for(g);
 end $function$
 ;
 
@@ -1349,6 +1498,29 @@ begin
   if exists (select 1 from public.rostos_dispatch where op = p_op and at > now() - gap) then return false; end if;
   insert into public.rostos_dispatch (op) values (p_op);
   return true;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.return_code_for(g uuid)
+ RETURNS text
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare c text; abc constant text := 'ACDEFGHJKMNPQRTUVWXY3479';
+begin
+  select code into c from public.guest_codes where guest_id = g;
+  while c is null loop
+    select string_agg(substr(abc, 1 + get_byte(b, i) % length(abc), 1), '' order by i) into c
+    from (select extensions.gen_random_bytes(6) as b) r, generate_series(0, 5) i;
+    begin
+      insert into public.guest_codes (guest_id, code) values (g, c);
+    exception when unique_violation then
+      c := null;
+      select code into c from public.guest_codes where guest_id = g;
+    end;
+  end loop;
+  return c;
 end $function$
 ;
 
@@ -1731,6 +1903,8 @@ alter table public.face_vectors enable row level security;
 
 alter table public.guest_codes enable row level security;
 
+alter table public.invites enable row level security;
+
 alter table public.guests enable row level security;
 
 alter table public.join_attempts enable row level security;
@@ -1802,6 +1976,8 @@ revoke all on public.face_vectors from public, anon, authenticated;
 revoke all on public.guest_codes from public, anon, authenticated;
 
 revoke all on public.guests from public, anon, authenticated;
+
+revoke all on public.invites from public, anon, authenticated;
 
 revoke all on public.join_attempts from public, anon, authenticated;
 
@@ -1951,6 +2127,16 @@ revoke all on function public.admin_secrets() from public, anon, authenticated;
 
 revoke all on function public.admin_set_code(p_code text) from public, anon, authenticated;
 
+revoke all on function public.admin_find_guests(p_q text) from public, anon, authenticated;
+
+revoke all on function public.admin_invite_set(p_id uuid, p jsonb) from public, anon, authenticated;
+
+revoke all on function public.admin_invites() from public, anon, authenticated;
+
+revoke all on function public.admin_invites_add(p_lines text) from public, anon, authenticated;
+
+revoke all on function public.admin_return_code(p_guest uuid) from public, anon, authenticated;
+
 revoke all on function public.admin_stats() from public, anon, authenticated;
 
 revoke all on function public.admin_update_event(p jsonb) from public, anon, authenticated;
@@ -2013,7 +2199,13 @@ revoke all on function public.my_face_progress() from public, anon, authenticate
 
 revoke all on function public.my_guest() from public, anon, authenticated;
 
+revoke all on function public.guest_name_taken(p_name text) from public, anon, authenticated;
+
+revoke all on function public.invite_peek(p_token text) from public, anon, authenticated;
+
 revoke all on function public.my_return_code() from public, anon, authenticated;
+
+revoke all on function public.return_code_for(g uuid) from public, anon, authenticated;
 
 revoke all on function public.name_matches(p_name text, p_target text) from public, anon, authenticated;
 
@@ -2080,6 +2272,16 @@ grant execute on function public.admin_face_secret() to authenticated;
 grant execute on function public.admin_face_stats() to authenticated;
 
 grant execute on function public.admin_mission(p_id uuid, p_title text, p_points integer, p_active boolean, p_sort integer, p_target text) to authenticated;
+
+grant execute on function public.admin_find_guests(p_q text) to authenticated;
+
+grant execute on function public.admin_invite_set(p_id uuid, p jsonb) to authenticated;
+
+grant execute on function public.admin_invites() to authenticated;
+
+grant execute on function public.admin_invites_add(p_lines text) to authenticated;
+
+grant execute on function public.admin_return_code(p_guest uuid) to authenticated;
 
 grant execute on function public.admin_secrets() to authenticated;
 

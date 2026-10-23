@@ -89,27 +89,73 @@ export async function readOriginal(path: string) {
   return res.blob()
 }
 
-/** The event code from the invitation QR (?c=...), remembered on this phone. */
-const CODE_KEY = storageKey('code')
-export function eventCode(): string {
+/** A value from the link (?c=, ?i=), remembered on this phone and taken off the address bar. */
+function fromLink(param: string, key: string): string {
   try {
-    const q = new URLSearchParams(location.search).get('c')
+    const q = new URLSearchParams(location.search).get(param)
     if (q) {
-      localStorage.setItem(CODE_KEY, q)
+      localStorage.setItem(key, q)
       const url = new URL(location.href)
-      url.searchParams.delete('c')
+      url.searchParams.delete(param)
       history.replaceState(null, '', url)
     }
-    return localStorage.getItem(CODE_KEY) ?? ''
+    return localStorage.getItem(key) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+/** The event code from the printed QR or the telão (?c=...), remembered on this phone. */
+const CODE_KEY = storageKey('code')
+export const eventCode = () => fromLink('c', CODE_KEY)
+
+/** The personal invitation (?i=...), remembered on this phone. */
+const INVITE_KEY = storageKey('invite')
+export const inviteToken = () => fromLink('i', INVITE_KEY)
+
+/** Keeps a code or invitation typed on the closed door, as if it had come in the link. */
+export function rememberEntry(kind: 'code' | 'invite', value: string) {
+  try {
+    localStorage.setItem(kind === 'code' ? CODE_KEY : INVITE_KEY, value)
+  } catch {
+    /* private mode: works until the page closes */
+  }
+}
+
+/** The código de volta in the QR the organizer shows (?v=...): used once, never kept. */
+export function returnCodeFromLink(): string {
+  try {
+    const q = new URLSearchParams(location.search).get('v')
+    if (!q) return ''
+    const url = new URL(location.href)
+    url.searchParams.delete('v')
+    history.replaceState(null, '', url)
+    return q.toUpperCase().replace(/[^A-Z0-9]/g, '')
   } catch {
     return ''
   }
 }
 
 export class JoinError extends Error {
-  constructor(public reason: 'code' | 'busy' | 'back' | 'other') {
+  // code: the door is only for invited guests; full: the invitation's seats are taken; name: someone with
+  // this name is already in (maybe this person, on another phone)
+  constructor(public reason: 'code' | 'busy' | 'back' | 'full' | 'name' | 'other') {
     super(reason)
   }
+}
+
+/** Why the join function said no, from its status and answer. */
+async function joinFailure(error: unknown): Promise<JoinError> {
+  const res = (error as { context?: Response }).context
+  const status = res?.status
+  if (status === 429) return new JoinError('busy')
+  if (status === 403) return new JoinError('code')
+  if (status === 404) return new JoinError('back')
+  if (status === 409) {
+    const body = await res!.json().catch(() => null)
+    return new JoinError(body?.error === 'nome' ? 'name' : 'full')
+  }
+  return new JoinError('other')
 }
 
 /** Checks the event code on the server, which creates the guest's login. */
@@ -128,14 +174,11 @@ function joinKey() {
   }
 }
 
-export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
+export async function join(code: string, g: Omit<Guest, 'id'>, sameName = false): Promise<Guest> {
   const { data, error } = await db.functions.invoke('join', {
-    body: { code, name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted(), key: joinKey() },
+    body: { code, invite: inviteToken(), name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted(), key: joinKey(), same_name: sameName },
   })
-  if (error) {
-    const status = (error as { context?: Response }).context?.status
-    throw new JoinError(status === 403 ? 'code' : status === 429 ? 'busy' : 'other')
-  }
+  if (error) throw await joinFailure(error)
   const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
   if (sessionError) throw new JoinError('other')
   try {
@@ -148,16 +191,45 @@ export async function join(code: string, g: Omit<Guest, 'id'>): Promise<Guest> {
   return { ...g, id: data.guest_id as string, name: (data.name as string | undefined) ?? g.name }
 }
 
+/** Signs in with the answer of an existing account (código de volta, or a name picked on an invitation). */
+async function signedBack(data: Record<string, unknown>): Promise<Guest> {
+  const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token as string, refresh_token: data.refresh_token as string })
+  if (sessionError) throw new JoinError('other')
+  return { id: data.guest_id as string, name: data.name as string, instagram: (data.instagram as string | null) ?? undefined, faceOptIn: !!data.face }
+}
+
 /** Back into an existing account on this phone with its código de volta, instead of joining again. */
 export async function comeBack(code: string): Promise<Guest> {
   const { data, error } = await db.functions.invoke('join', { body: { back: code } })
-  if (error) {
-    const status = (error as { context?: Response }).context?.status
-    throw new JoinError(status === 404 ? 'back' : status === 429 ? 'busy' : 'other')
-  }
-  const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
-  if (sessionError) throw new JoinError('other')
-  return { id: data.guest_id as string, name: data.name as string, instagram: (data.instagram as string | null) ?? undefined, faceOptIn: !!data.face }
+  if (error) throw await joinFailure(error)
+  return signedBack(data)
+}
+
+export type InviteInfo = { label: string; seats: number; people: { id: string; name: string }[] }
+
+/** Who already came in with this invitation; null when the link is wrong or was cancelled. */
+export async function peekInvite(token: string): Promise<InviteInfo | null> {
+  const { data, error } = await db.functions.invoke('join', { body: { invite: token, peek: true } })
+  if (!error) return data as InviteInfo
+  const why = await joinFailure(error)
+  if (why.reason === 'back') return null
+  throw why
+}
+
+/** Back into the account of the name picked on the invitation. */
+export async function joinAs(token: string, guestId: string): Promise<Guest> {
+  const { data, error } = await db.functions.invoke('join', { body: { invite: token, as: guestId } })
+  if (error) throw await joinFailure(error)
+  return signedBack(data)
+}
+
+/** Whether the event code opens the door (checked before the guest fills in the form). */
+export async function checkCode(code: string): Promise<boolean> {
+  const { error } = await db.functions.invoke('join', { body: { check: code } })
+  if (!error) return true
+  const why = await joinFailure(error)
+  if (why.reason === 'code') return false
+  throw why
 }
 
 /** This guest's código de volta (made on first ask). */
@@ -289,6 +361,8 @@ export interface AdminEvent {
   lat: number | null
   lng: number | null
   test_mode: boolean
+  /** only invited guests sign up (personal invitation or the event code) */
+  invite_only: boolean
   /** missions with people: on, the biggest group drawn, and how many guests the party needs before they start */
   gen_missions: boolean
   gen_max_people: number
@@ -314,6 +388,30 @@ export const admin = {
   faceStats: () => call<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>('admin_face_stats'),
   faceSecret: () => call<string>('admin_face_secret'),
   wipeFaces: () => call<void>('admin_wipe_faces'),
+  invites: () => call<AdminInvite[]>('admin_invites'),
+  addInvites: (lines: string) => call<number>('admin_invites_add', { p_lines: lines }),
+  setInvite: (id: string, p: { label?: string; seats?: number; revoked?: boolean }) => call<void>('admin_invite_set', { p_id: id, p }),
+  findGuests: (q: string) => call<FoundGuest[]>('admin_find_guests', { p_q: q }),
+  returnCode: (guestId: string) => call<string>('admin_return_code', { p_guest: guestId }),
+}
+
+export interface AdminInvite {
+  id: string
+  token: string
+  label: string
+  seats: number
+  revoked: boolean
+  /** names of who came in with it, in order */
+  people: string[]
+}
+
+export interface FoundGuest {
+  id: string
+  name: string
+  instagram: string | null
+  created_at: string
+  invite: string | null
+  photos: number
 }
 
 interface PhotoRow {
