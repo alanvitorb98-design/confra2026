@@ -11,7 +11,7 @@ import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
 import { TabIcon } from './components/Icons'
 import { Shutter } from './components/Shutter'
-import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, join, leave, loadEvent, onSignedOut, sendSelfie, useParty } from './lib/backend'
+import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, inviteToken, join, joinAs, leave, loadEvent, onSignedOut, returnCodeFromLink, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
@@ -64,6 +64,9 @@ export default function App() {
   const camera = useRef<HTMLInputElement>(null)
   const gallery = useRef<HTMLInputElement>(null)
   const [code] = useState(eventCode)
+  const [invite] = useState(inviteToken)
+  // the organizer's QR de volta, for a phone that lost its account
+  const [returnCode] = useState(returnCodeFromLink)
   // the opening screen is for the first visit: once the terms are accepted the app opens straight in
   const [intro, setIntro] = useState(() => !termsAccepted())
   const [gate, setGate] = useState(() => !isInstalled() && !browserChosen())
@@ -209,10 +212,14 @@ export default function App() {
   if (!guest) return (
       <Welcome
         code={code}
+        invite={invite}
+        inviteOnly={EVENT.inviteOnly}
+        autoBack={returnCode || undefined}
+        onAs={async (t, id) => setGuest(await joinAs(t, id))}
         onStart={t < EVENT.start.getTime() ? () => setStart(true) : undefined}
         onBack={async (c) => setGuest(await comeBack(c))}
-        onEnter={async (c, g) => {
-          const me = await join(c, g)
+        onEnter={async (c, g, sameName) => {
+          const me = await join(c, g, sameName)
           setGuest(me)
           // face matching is opt-in: the selfie goes up only for those who said yes
           if (g.faceOptIn && g.selfieUrl) {

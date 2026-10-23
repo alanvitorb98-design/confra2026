@@ -1,5 +1,7 @@
-// Entry to the party: creates a real login for the guest. Open to anyone with the link (no QR code needed),
-// with limits per network and in total so nobody can flood it with fake guests.
+// Entry to the party: creates a real login for the guest, with limits per network and in total so nobody can
+// flood it with fake guests. Anyone with the link gets in, unless the organizer turned on "só com convite":
+// then only a personal invitation (?i=, with seats) or the event code (?c=, printed QR and telão) lets a new
+// guest in. Whoever opens a personal invitation again picks their name and is back in the same account.
 import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const URL_ = Deno.env.get('SUPABASE_URL')!
@@ -15,6 +17,9 @@ const MAX_GUESTS = 1500
 // 190 million codes
 const MAX_BACK_TRIES_PER_HOUR = 200
 const MAX_BACK_TRIES_TOTAL = 2000
+
+type Invite = { id: string; label: string; seats: number; revoked: boolean; people: { id: string; name: string }[] }
+const cleanCode = (v: unknown) => (typeof v === 'string' ? v.toUpperCase().replace(/[^A-Z0-9]/g, '') : '')
 
 const cors = (origin: string | null) => ({
   'Access-Control-Allow-Origin': origin && ORIGINS.includes(origin) ? origin : ORIGINS[0],
@@ -53,16 +58,61 @@ Deno.serve(async (req) => {
     return signError ? null : signed.session
   }
 
-  // back into an existing account with its código de volta (another phone, browser, or cleared data)
-  if (typeof body.back === 'string') {
+  // guessing a código de volta, an invitation or the event code: each try is written down before counting
+  // (tries sent all at once each count the others), per network and by everyone together
+  const tooManyGuesses = async () => {
     const tag = `volta:${ip}`
-    // each try is written down before counting: tries sent all at once each count the others
     await admin.from('join_attempts').insert({ ip: tag })
     const [{ count: tries }, { count: all }] = await Promise.all([
       admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', tag).gte('at', since),
       admin.from('join_attempts').select('*', { count: 'exact', head: true }).like('ip', 'volta:%').gte('at', since),
     ])
-    if ((tries ?? 0) > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL) return reply(429, { error: 'muitas tentativas' })
+    return (tries ?? 0) > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL
+  }
+  const findInvite = async (token: string) => {
+    if (token.length !== 10) return null
+    const { data } = await admin.rpc('invite_peek', { p_token: token })
+    return (data as Invite | null) ?? null
+  }
+
+  const inviteToken = cleanCode(body.invite)
+
+  // an invitation opened: who already came in with it, so the guest can pick their own name
+  if (body.peek === true) {
+    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    const inv = await findInvite(inviteToken)
+    if (!inv || inv.revoked) return reply(404, { error: 'convite' })
+    return reply(200, { label: inv.label, seats: inv.seats, people: inv.people })
+  }
+
+  // the event code typed or scanned, checked before the guest fills in the form
+  if (typeof body.check === 'string') {
+    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    const { data: sec } = await admin.from('event_secret').select('code').maybeSingle()
+    return cleanCode(body.check) && cleanCode(body.check) === cleanCode(sec?.code) ? reply(200, { ok: true }) : reply(403, { error: 'código' })
+  }
+
+  // back into the account of a name picked on the invitation
+  if (typeof body.as === 'string') {
+    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    const inv = await findInvite(inviteToken)
+    if (!inv || inv.revoked || !inv.people.some((p) => p.id === body.as)) return reply(404, { error: 'convite' })
+    const { data: g } = await admin.from('guests').select('id, name, instagram, face_opt_in, user_id').eq('id', body.as).maybeSingle()
+    const session = g?.user_id ? await signInAs(g.user_id) : null
+    if (!session) return reply(500, { error: 'sessao' })
+    return reply(200, {
+      guest_id: g!.id,
+      name: g!.name,
+      instagram: g!.instagram,
+      face: g!.face_opt_in,
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    })
+  }
+
+  // back into an existing account with its código de volta (another phone, browser, or cleared data)
+  if (typeof body.back === 'string') {
+    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
     const code = body.back.toUpperCase().replace(/[^A-Z0-9]/g, '')
     const { data: hit } = code.length === 6 ? await admin.from('guest_codes').select('guest_id').eq('code', code).maybeSingle() : { data: null }
     const { data: g } = hit
@@ -118,6 +168,32 @@ Deno.serve(async (req) => {
     }
   }
 
+  // with "só com convite" on, a new guest needs an invitation with a free seat or the event code
+  const inv = inviteToken ? await findInvite(inviteToken) : null
+  const inviteId = inv && !inv.revoked && inv.people.length < inv.seats ? inv.id : null
+  if (!inviteId) {
+    const [{ data: cfg }, { data: sec }] = await Promise.all([
+      admin.from('event_config').select('invite_only').maybeSingle(),
+      admin.from('event_secret').select('code').maybeSingle(),
+    ])
+    const codeOk = !!cleanCode(body.code) && cleanCode(body.code) === cleanCode(sec?.code)
+    if (cfg?.invite_only && !codeOk) {
+      if (keyMine) await admin.from('join_keys').delete().eq('key', key)
+      return reply(inv && !inv.revoked ? 409 : 403, { error: inv && !inv.revoked ? 'cheio' : 'convite' })
+    }
+  }
+
+  // someone already in with the same name: most likely this person on another phone or browser. The phone
+  // asks "is it you?" and sends again with same_name when it is someone else.
+  if (body.same_name !== true) {
+    const { data: taken } = await admin.rpc('guest_name_taken', { p_name: name })
+    if (taken) {
+      // the next try (with same_name) must make the guest, not wait for this one
+      if (keyMine) await admin.from('join_keys').delete().eq('key', key)
+      return reply(409, { error: 'nome' })
+    }
+  }
+
   const email = `${crypto.randomUUID()}@convidados.confra`
   const password = Array.from(crypto.getRandomValues(new Uint8Array(32)), (b) => b.toString(16).padStart(2, '0')).join('')
   const { data: created, error: userError } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
@@ -130,6 +206,7 @@ Deno.serve(async (req) => {
       instagram: instagram || null,
       face_opt_in: body.face === true,
       user_id: created.user.id,
+      invite_id: inviteId,
       terms_version: terms,
       terms_at: terms ? new Date().toISOString() : null,
     })

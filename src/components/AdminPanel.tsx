@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { admin, PEOPLE_POINTS, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
 import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
+import { InvitesAdmin, ReturnHelp } from './AdminInvites'
 import { BRAND } from '../brand/brand'
 
 const APP_URL = `${location.origin}${import.meta.env.BASE_URL}`
@@ -26,6 +27,9 @@ const TIMES: { key: keyof AdminEvent; label: string }[] = [
   { key: 'party_ends', label: 'Festa termina' },
 ]
 
+// no look-alike letters or digits, so it can be read out loud or typed from paper
+const randomCode = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => 'ACDEFGHJKMNPQRTUVWXY3479'[b % 24]).join('')
+
 const mb = (b: number) => (b / 1024 / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 0 })
 
 interface Props {
@@ -46,14 +50,18 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
   const [faceStats, setFaceStats] = useState<{ has_secret: boolean; worker_seen: string | null; selfies: number; pending: number }>()
   const [faceSecret, setFaceSecret] = useState<string>()
   const [r2, setR2] = useState<boolean>()
+  // the event code goes in the QR and the link, so they still open the door with "só com convite" on
+  const [code, setCode] = useState<string>()
+  const [newCode, setNewCode] = useState<string>()
 
-  const link = APP_URL
+  const link = code ? `${APP_URL}?c=${code}` : APP_URL
 
   useEffect(() => {
     admin.event().then(setEv).catch(() => setMsg('Não consegui carregar as configurações.'))
     admin.stats().then(setStats).catch(() => undefined)
     admin.faceStats().then(setFaceStats).catch(() => undefined)
     r2Status().then(setR2)
+    admin.code().then(setCode, () => undefined)
   }, [])
 
   useEffect(() => {
@@ -120,13 +128,59 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
 
       <section className="panel admin-section">
         <h3>Convite</h3>
-        <p className="page-note">Qualquer pessoa com o link ou o QR entra, sem código. Imprime no convite ou manda no grupo.</p>
+        {ev && (
+          <label className="admin-mini">
+            <input
+              type="checkbox"
+              checked={ev.invite_only}
+              disabled={busy}
+              onChange={(e) => {
+                const on = e.target.checked
+                set('invite_only', on)
+                run(() => admin.saveEvent({ invite_only: on }), on ? 'Agora só entra quem tem convite ou este QR.' : 'Agora qualquer pessoa com o link entra.')
+              }}
+            />{' '}
+            Só entra com convite
+          </label>
+        )}
+        <p className="page-note">
+          {ev?.invite_only
+            ? 'Só entra quem tem um convite pessoal (abaixo) ou este QR, que leva o código da festa. Quem já entrou continua entrando.'
+            : 'Qualquer pessoa com o link ou o QR entra. Ligue "Só entra com convite" quando os convites e este QR já estiverem com os convidados.'}
+          {' '}Imprima no convite, ponha nas mesas ou mande no grupo.
+        </p>
         {qr && <img className="admin-qr" src={qr} alt={`QR code para ${link}`} />}
+        {code && <p className="page-note">Código da festa: <b>{code}</b></p>}
         <div className="admin-row">
           <button className="btn primary small" onClick={downloadQr} disabled={!qr}>Baixar QR</button>
           <button className="btn ghost small" onClick={() => run(() => navigator.clipboard.writeText(link), 'Link copiado.')} disabled={!link}>Copiar link</button>
+          {code && !newCode && (
+            <button className="btn ghost small" onClick={() => setNewCode(randomCode())}>Trocar código</button>
+          )}
         </div>
+        {newCode && (
+          <div className="same-name">
+            <p>O código passa a ser <b>{newCode}</b>. QRs e links impressos com o código antigo param de funcionar pra quem ainda não entrou. Quem já entrou não é afetado.</p>
+            <div className="admin-row">
+              <button
+                className="btn primary small"
+                disabled={busy}
+                onClick={() => run(async () => {
+                  await admin.setCode(newCode)
+                  setCode(newCode)
+                  setNewCode(undefined)
+                }, 'Código trocado. Baixe o QR novo.')}
+              >
+                Trocar
+              </button>
+              <button className="btn ghost small" onClick={() => setNewCode(undefined)}>Deixar como está</button>
+            </div>
+          </div>
+        )}
       </section>
+
+      <InvitesAdmin run={run} busy={busy} />
+      <ReturnHelp />
 
       {ev && (
         <section className="panel admin-section">

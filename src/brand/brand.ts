@@ -38,6 +38,8 @@ export const BRAND = {
   slug: 'confra26',
   /** File name of the QR code the organizer downloads */
   qrFile: 'qr-confra-da-firma.png',
+  /** goes before the personal invitation link sent on WhatsApp */
+  inviteMessage: 'Seu convite pro app de fotos da Confra. Abre no celular no dia:',
   /** One line for the app manifest */
   description: 'As fotos da confraternização de fim de ano 2026',
   /** Colors drawn outside CSS (QR codes, shared stories, the shutter's lens); match brand.css */

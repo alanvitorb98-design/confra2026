@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import QRCode from 'qrcode'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Photo } from '../lib/types'
+import { admin } from '../lib/backend'
 import { PolaroidFrame } from './Polaroid'
 import { Logo } from './Logo'
 import { BRAND } from '../brand/brand'
@@ -49,7 +50,9 @@ export function Telao({ photos, onClose }: { photos: Photo[]; onClose: () => voi
   }, [i, fresh, list.length])
 
   useEffect(() => {
-    QRCode.toDataURL(APP_URL, { width: 360, margin: 1, errorCorrectionLevel: 'M', color: { dark: BRAND.colors.ink, light: '#fffdf7' } }).then(setQr, () => undefined)
+    // with the event code, so the QR still opens the door when only invited guests sign up
+    const draw = (url: string) => QRCode.toDataURL(url, { width: 360, margin: 1, errorCorrectionLevel: 'M', color: { dark: BRAND.colors.ink, light: '#fffdf7' } }).then(setQr, () => undefined)
+    admin.code().then((code) => draw(`${APP_URL}?c=${code}`), () => draw(APP_URL))
   }, [])
 
   // fullscreen and keep the screen on; both may be refused, the slideshow works anyway
