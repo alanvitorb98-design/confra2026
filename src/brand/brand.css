@@ -98,3 +98,10 @@
 .flute-glint { fill: none; stroke: #fff; stroke-opacity: .8; stroke-width: 2.6; stroke-linecap: round; }
 .flute-line { fill: none; stroke: var(--ink); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .flute-foot { fill: rgb(255 252 240 / .75); }
+
+/* Samsung Internet darkens light sites on its own unless the site has a dark-mode rule: this one keeps the
+   light theme (Chrome follows `color-scheme: only light` in index.css) */
+@media (prefers-color-scheme: dark) {
+  :root { color-scheme: only light; }
+  html { background: var(--paper); }
+}
