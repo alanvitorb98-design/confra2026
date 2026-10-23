@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { fakeBackend } from './backend'
+import { event, fakeBackend } from './backend'
 
 // the app's phases follow the phone's clock: tests pin it so they pass on any date
 const BEFORE = new Date('2026-10-20T12:00:00-03:00')
@@ -56,4 +56,13 @@ test('during the party a new guest gets the sign-up form', async ({ page }) => {
   await openInBrowser(page)
   await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeVisible({ timeout: 15_000 })
   await expect(page.getByRole('button', { name: 'Já me cadastrei em outro celular' })).toBeVisible()
+})
+
+test('the countdown shows the map of the party place', async ({ page }) => {
+  await fakeBackend(page, { event_public: { ...event, lat: -24.2944475, lng: -53.854665 } })
+  // the map comes from OpenStreetMap: answered here so the test stays offline
+  await page.route(/openstreetmap\.org\//, (route) => route.fulfill({ contentType: 'text/html', body: '<p>mapa</p>' }))
+  await openInBrowser(page)
+  await page.getByRole('button', { name: 'Ver o local' }).click({ timeout: 15_000 })
+  await expect(page.frameLocator('iframe[title="Mapa do local"]').getByText('mapa')).toBeVisible()
 })
