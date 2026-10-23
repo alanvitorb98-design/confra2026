@@ -84,9 +84,20 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
 
   const set = <K extends keyof AdminEvent>(k: K, v: AdminEvent[K]) => setEv((e) => (e ? { ...e, [k]: v } : e))
 
+  // coordinates pasted as they are ("-24.28, -53.84", copied from a pin in Google Maps) or inside a full Google
+  // Maps link (@-24.28,-53.84 or ?q=-24.28,-53.84); a short maps.app.goo.gl link can't be opened from the browser
+  const pinIn = (text?: string | null) => {
+    const m = (text ?? '').match(/(?:^|[@=\s])(-?\d{1,2}\.\d{3,}),\s*(-?\d{1,3}\.\d{3,})/)
+    const [lat, lng] = m ? [Number(m[1]), Number(m[2])] : []
+    return lat != null && lng != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null
+  }
+
   // the map pin from the place and address: the full text first, then the address alone (a venue's own name
   // or "R." for "Rua" often throws OpenStreetMap off)
   const geocode = async (e: AdminEvent) => {
+    const pinned = pinIn(e.maps_url) ?? pinIn(e.address)
+    // bare coordinates in the link field become a link the guests' "Abrir no mapa" can open
+    if (pinned) return /^https?:/i.test((e.maps_url ?? '').trim()) || !pinIn(e.maps_url) ? pinned : { ...pinned, maps_url: `https://www.google.com/maps?q=${pinned.lat},${pinned.lng}` }
     const address = e.address.replace(/\bR\.\s*/g, 'Rua ').replace(/\bAv\.\s*/g, 'Avenida ')
     const tries = [[e.place, e.address].filter(Boolean).join(', '), address, address.replace(/\s+-\s+[^,]*,/, ',')]
     for (const q of [...new Set(tries.filter(Boolean))]) {
@@ -110,7 +121,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
     ev &&
     run(async () => {
       let next = ev
-      if (next.lat == null && (next.address || next.place)) {
+      if (pinIn(next.maps_url) || (next.lat == null && (next.address || next.place))) {
         const at = await geocode(next).catch(() => null)
         if (at) setEv((next = { ...next, ...at }))
       }
@@ -230,7 +241,8 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
             <span>Link do Google Maps <em>opcional</em></span>
             <input value={ev.maps_url} onChange={(e) => set('maps_url', e.target.value)} inputMode="url" />
           </label>
-          <button className="btn ghost small" onClick={findOnMap} disabled={busy || !(ev.address || ev.place)}>Achar no mapa</button>
+          <p className="page-note">Pino no lugar errado? No Google Maps, segure o dedo em cima do lugar, copie os números que aparecem (tipo -24.28, -53.84), cole aqui no link e toque em Achar no mapa.</p>
+          <button className="btn ghost small" onClick={findOnMap} disabled={busy || !(ev.address || ev.place || ev.maps_url)}>Achar no mapa</button>
           <PlaceMap lat={ev.lat} lng={ev.lng} />
 
 
