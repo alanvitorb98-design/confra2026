@@ -84,15 +84,39 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
 
   const set = <K extends keyof AdminEvent>(k: K, v: AdminEvent[K]) => setEv((e) => (e ? { ...e, [k]: v } : e))
 
+  // the map pin from the place and address: the full text first, then the address alone (a venue's own name
+  // or "R." for "Rua" often throws OpenStreetMap off)
+  const geocode = async (e: AdminEvent) => {
+    const address = e.address.replace(/\bR\.\s*/g, 'Rua ').replace(/\bAv\.\s*/g, 'Avenida ')
+    const tries = [[e.place, e.address].filter(Boolean).join(', '), address, address.replace(/\s+-\s+[^,]*,/, ',')]
+    for (const q of [...new Set(tries.filter(Boolean))]) {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q)}`)
+      const [hit] = (await res.json()) as { lat: string; lon: string }[]
+      if (hit) return { lat: Number(hit.lat), lng: Number(hit.lon) }
+    }
+    return null
+  }
+
   const findOnMap = () =>
     ev &&
     run(async () => {
-      const q = [ev.place, ev.address].filter(Boolean).join(', ')
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=br&q=${encodeURIComponent(q)}`)
-      const [hit] = (await res.json()) as { lat: string; lon: string }[]
-      if (!hit) throw new Error('não achei')
-      setEv({ ...ev, lat: Number(hit.lat), lng: Number(hit.lon) })
+      const at = await geocode(ev)
+      if (!at) throw new Error('não achei')
+      setEv({ ...ev, ...at })
     }, 'Achei no mapa. Confere o pino e salva.')
+
+  // saving a place with no pin yet looks it up first, so the guests' map is not left empty
+  const saveEvent = () =>
+    ev &&
+    run(async () => {
+      let next = ev
+      if (next.lat == null && (next.address || next.place)) {
+        const at = await geocode(next).catch(() => null)
+        if (at) setEv((next = { ...next, ...at }))
+      }
+      await admin.saveEvent(next)
+      return next.lat != null || !(next.address || next.place)
+    }, (pinned) => (pinned ? 'Salvo. Todo mundo vê na hora.' : 'Salvo, mas não achei o lugar no mapa. Confere o endereço e toca em Achar no mapa.'))
 
   const downloadQr = () => {
     if (!qr) return
@@ -210,7 +234,7 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
           <PlaceMap lat={ev.lat} lng={ev.lng} />
 
 
-          <button className="btn primary wide" disabled={busy} onClick={() => run(() => admin.saveEvent(ev), 'Salvo. Todo mundo vê na hora.')}>
+          <button className="btn primary wide" disabled={busy} onClick={saveEvent}>
             Salvar evento
           </button>
         </section>
