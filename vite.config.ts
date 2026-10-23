@@ -18,6 +18,8 @@ const CSP = [
   "img-src 'self' data: blob: https:",
   "media-src 'self' data: blob: https:",
   "connect-src 'self' blob: data: https://*.supabase.co wss://*.supabase.co https://*.r2.cloudflarestorage.com https://nominatim.openstreetmap.org",
+  // the party place map (PlaceMap)
+  "frame-src https://www.openstreetmap.org",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "object-src 'none'",
