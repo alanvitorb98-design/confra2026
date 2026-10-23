@@ -16,7 +16,7 @@ interface Props {
 
 type Stage = 'zoom' | 'develop' | 'done'
 
-const HOLD_MS = 2200
+const HOLD_MS = 1100
 const needsMotionPrompt =
   typeof DeviceMotionEvent !== 'undefined' &&
   typeof (DeviceMotionEvent as unknown as { requestPermission?: unknown }).requestPermission === 'function'
@@ -75,7 +75,7 @@ export function Develop({ file, onPost, onDiscard, postLabel }: Props) {
 
   useShake(
     (strength) => {
-      advance(0.1 + strength * 0.12)
+      advance(0.2 + strength * 0.24)
       buzz(15)
     },
     stage === 'develop' && canShake,
