@@ -392,6 +392,7 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .field { display: grid; gap: 6px; }
 .field > span { font-size: 19px; font-family: var(--hand); font-style: var(--hand-style); font-weight: var(--hand-weight); letter-spacing: 0; text-transform: none; color: var(--ink-2); }
 .field em { font-style: normal; opacity: .6; text-transform: none; letter-spacing: 0; }
+.field em.field-hint { font-size: 14px; opacity: .8; }
 .field input {
   height: 52px; border-radius: 14px; padding: 0 16px; font: inherit; font-size: 17px; color: var(--ink);
   background: rgb(255 253 246 / .92); border: 1px solid var(--line);
