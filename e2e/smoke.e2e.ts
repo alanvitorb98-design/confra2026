@@ -66,3 +66,9 @@ test('the countdown shows the map of the party place', async ({ page }) => {
   await page.getByRole('button', { name: 'Ver o local' }).click({ timeout: 15_000 })
   await expect(page.frameLocator('iframe[title="Mapa do local"]').getByText('mapa')).toBeVisible()
 })
+
+test("the phone's dark mode never repaints the app", async ({ page }) => {
+  // Chrome and Samsung Internet darken light sites on their own unless the page opts out with "only light"
+  await page.goto('/')
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme.split(' ').sort())).toEqual(['light', 'only'])
+})
