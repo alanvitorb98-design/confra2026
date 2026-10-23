@@ -40,10 +40,10 @@ test('a family member not on the list yet signs up with the invitation', async (
   })
   await open(page, '/?i=ACDEFGHJKM')
   await page.getByRole('button', { name: 'Sou outra pessoa' }).click({ timeout: 15_000 })
-  await page.getByLabel('Seu nome').fill('Davi')
+  await page.getByLabel('Nome e sobrenome').fill('Davi Souza')
   await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
   await page.getByRole('button', { name: 'Entrar na festa' }).click()
-  await expect.poll(() => joins(calls).find((b) => b.name)).toMatchObject({ name: 'Davi', invite: 'ACDEFGHJKM' })
+  await expect.poll(() => joins(calls).find((b) => b.name)).toMatchObject({ name: 'Davi Souza', invite: 'ACDEFGHJKM' })
 })
 
 test('with "só com convite" on, the door asks for the code before the form', async ({ page }) => {
@@ -62,10 +62,10 @@ test('with "só com convite" on, the door asks for the code before the form', as
   // a whole link pasted works too
   await page.getByLabel('Código ou link do convite').fill('https://festa.example/?c=festa1')
   await page.getByRole('button', { name: 'Continuar' }).click()
-  await page.getByLabel('Seu nome').fill('Ana')
+  await page.getByLabel('Nome e sobrenome').fill('Ana Lima')
   await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
   await page.getByRole('button', { name: 'Entrar na festa' }).click()
-  await expect.poll(() => joins(calls).find((b) => b.name)).toMatchObject({ name: 'Ana', code: 'FESTA1' })
+  await expect.poll(() => joins(calls).find((b) => b.name)).toMatchObject({ name: 'Ana Lima', code: 'FESTA1' })
 })
 
 test('a name already in asks "is it you?" before making a second account', async ({ page }) => {
@@ -73,10 +73,10 @@ test('a name already in asks "is it you?" before making a second account', async
     join: (b: Body) => (b.name && !b.same_name ? { status: 409, json: { error: 'nome' } } : null),
   })
   await open(page, '/')
-  await page.getByLabel('Seu nome').fill('Bia', { timeout: 15_000 })
+  await page.getByLabel('Nome e sobrenome').fill('Bia Rocha', { timeout: 15_000 })
   await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
   await page.getByRole('button', { name: 'Entrar na festa' }).click()
-  await expect(page.getByText(/Já tem alguém chamado Bia na festa/)).toBeVisible()
+  await expect(page.getByText(/Já tem alguém chamado Bia Rocha na festa/)).toBeVisible()
 
   // "it's me" leads to the código de volta
   await page.getByRole('button', { name: 'Sou eu, quero voltar pra minha conta' }).click()
@@ -85,7 +85,18 @@ test('a name already in asks "is it you?" before making a second account', async
 
   // someone else with the same name goes ahead
   await page.getByRole('button', { name: 'Não, sou outra pessoa' }).click()
-  await expect.poll(() => joins(calls).filter((b) => b.name).at(-1)).toMatchObject({ name: 'Bia', same_name: true })
+  await expect.poll(() => joins(calls).filter((b) => b.name).at(-1)).toMatchObject({ name: 'Bia Rocha', same_name: true })
+})
+
+test('a first name alone asks for the surname before entering', async ({ page }) => {
+  await fakeBackend(page)
+  await open(page, '/')
+  await page.getByLabel('Nome e sobrenome').fill('Bia', { timeout: 15_000 })
+  await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
+  await expect(page.getByText('Coloca o sobrenome também')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeDisabled()
+  await page.getByLabel('Nome e sobrenome').fill('Bia Rocha')
+  await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeEnabled()
 })
 
 test("the organizer's QR de volta signs the phone back in on its own", async ({ page }) => {

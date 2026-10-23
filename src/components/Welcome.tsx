@@ -82,7 +82,9 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, autoBa
     setCam(false)
   }
 
-  const ready = name.trim().length > 1 && (!faceOptIn || selfieUrl)
+  // first name and surname: two Anas at the party are told apart, and "é você?" asks less often
+  const fullName = /\S{2,}\s+\S{2,}/.test(name.trim())
+  const ready = fullName && (!faceOptIn || selfieUrl)
 
   const submit = async (otherPerson: boolean) => {
     if (!ready || busy) return
@@ -167,8 +169,9 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, autoBa
       >
         {info && freeSeat && <p className="invite-name">Convite: <b>{info.label}</b></p>}
         <label className="field">
-          <span>Seu nome</span>
-          <input id="name" value={name} onChange={(e) => { setName(e.target.value); setSameName(false) }} placeholder={BRAND.namePlaceholder} autoComplete="given-name" />
+          <span>Nome e sobrenome</span>
+          <input id="name" value={name} onChange={(e) => { setName(e.target.value); setSameName(false) }} placeholder={BRAND.namePlaceholder} autoComplete="name" />
+          {name.trim().length > 1 && !fullName && <em className="field-hint">Coloca o sobrenome também: pode ter mais de uma pessoa com o mesmo nome.</em>}
         </label>
         <label className="field">
           <span>Instagram <em>opcional</em></span>

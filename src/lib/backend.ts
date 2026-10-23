@@ -392,6 +392,11 @@ export const admin = {
   addInvites: (lines: string) => call<number>('admin_invites_add', { p_lines: lines }),
   setInvite: (id: string, p: { label?: string; seats?: number; revoked?: boolean }) => call<void>('admin_invite_set', { p_id: id, p }),
   findGuests: (q: string) => call<FoundGuest[]>('admin_find_guests', { p_q: q }),
+  /** everyone's name, to suggest who has to appear in a mission */
+  guestNames: async () => {
+    const { data } = await everyRow<{ name: string }>((a, b) => db.from('guests').select('name').order('name').range(a, b))
+    return [...new Set((data ?? []).map((g) => g.name))]
+  },
   returnCode: (guestId: string) => call<string>('admin_return_code', { p_guest: guestId }),
 }
 

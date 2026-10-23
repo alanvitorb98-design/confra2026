@@ -27,7 +27,7 @@ export const BRAND = {
   /** Button on the opening screen */
   enter: 'Bora!',
   /** Placeholder of the name field */
-  namePlaceholder: 'como te chamam na firma',
+  namePlaceholder: 'Ex.: João Silva',
   /** Where the face data is used, inside "Seu rosto só é usado ___ e é apagado depois da festa." */
   faceScope: 'aqui na confra',
   /** What the outfit wall is called */
