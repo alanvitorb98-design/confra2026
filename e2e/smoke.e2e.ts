@@ -58,6 +58,24 @@ test('during the party a new guest gets the sign-up form', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Já me cadastrei em outro celular' })).toBeVisible()
 })
 
+test('from the sign-up form a guest can go back to the date and place, and return', async ({ page }) => {
+  // the app is open for sign-up but the party has not started yet
+  await page.clock.install({ time: new Date('2026-11-06T21:00:00-03:00') })
+  await openInBrowser(page)
+  await page.getByRole('button', { name: 'Voltar pro início (data e local)' }).click({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Ver o local' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sou da organização' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Fazer meu cadastro' }).click()
+  await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeVisible()
+})
+
+test('once the party started the sign-up form has no way back to the countdown', async ({ page }) => {
+  await page.clock.install({ time: DURING })
+  await openInBrowser(page)
+  await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.getByRole('button', { name: 'Voltar pro início (data e local)' })).toHaveCount(0)
+})
+
 test('the countdown shows the map of the party place', async ({ page }) => {
   await fakeBackend(page, { event_public: { ...event, lat: -24.2944475, lng: -53.854665 } })
   // the map comes from OpenStreetMap: answered here so the test stays offline

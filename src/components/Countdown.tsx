@@ -29,8 +29,9 @@ function Unit({ value, label }: { value: number; label: string }) {
   )
 }
 
-/** Before the app opens: countdown to the party, with the place behind a button. */
-export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void }) {
+/** Before the app opens: countdown to the party, with the place behind a button. Seen again from the sign-up
+ * form (onSignUp), it leads back there instead. */
+export function Countdown({ onOrganizer, onSignUp }: { onOrganizer: (code: string) => void; onSignUp?: () => void }) {
   const t = useNow(true)
   const left = split(EVENT.start.getTime() - t)
   const [place, setPlace] = useState(false)
@@ -88,20 +89,26 @@ export function Countdown({ onOrganizer }: { onOrganizer: (code: string) => void
       </AnimatePresence>
       )}
 
-      <p className="cd-note">O app abre no dia {day(APP_OPENS)} às {clock(APP_OPENS)} pra você fazer seu cadastro.</p>
-
-      {org ? (
-        <form className="cd-test" onSubmit={(e) => { e.preventDefault(); if (orgCode.trim()) onOrganizer(orgCode.trim()) }}>
-          <b>Entrar como organização</b>
-          <p>Digite o código de organizador. Depois é só fazer seu cadastro e o painel aparece em Eu.</p>
-          <input value={orgCode} onChange={(e) => setOrgCode(e.target.value.toUpperCase())} placeholder="ADM-XXXXXXXX" autoCapitalize="characters" autoComplete="off" />
-          <div className="cd-actions">
-            <button className="btn primary small" disabled={!orgCode.trim()}>Entrar</button>
-            <button type="button" className="btn ghost small" onClick={() => setOrg(false)}>Fechar</button>
-          </div>
-        </form>
+      {onSignUp ? (
+        <button className="btn primary wide" onClick={onSignUp}>Fazer meu cadastro</button>
       ) : (
-        <button className="cd-org" onClick={() => setOrg(true)}>Sou da organização</button>
+        <>
+        <p className="cd-note">O app abre no dia {day(APP_OPENS)} às {clock(APP_OPENS)} pra você fazer seu cadastro.</p>
+
+        {org ? (
+          <form className="cd-test" onSubmit={(e) => { e.preventDefault(); if (orgCode.trim()) onOrganizer(orgCode.trim()) }}>
+            <b>Entrar como organização</b>
+            <p>Digite o código de organizador. Depois é só fazer seu cadastro e o painel aparece em Eu.</p>
+            <input value={orgCode} onChange={(e) => setOrgCode(e.target.value.toUpperCase())} placeholder="ADM-XXXXXXXX" autoCapitalize="characters" autoComplete="off" />
+            <div className="cd-actions">
+              <button className="btn primary small" disabled={!orgCode.trim()}>Entrar</button>
+              <button type="button" className="btn ghost small" onClick={() => setOrg(false)}>Fechar</button>
+            </div>
+          </form>
+        ) : (
+          <button className="cd-org" onClick={() => setOrg(true)}>Sou da organização</button>
+        )}
+        </>
       )}
 
     </div>

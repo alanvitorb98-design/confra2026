@@ -17,7 +17,7 @@ import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
 import { Countdown } from './components/Countdown'
 import { PhaseBar } from './components/PhaseBar'
-import { LOOK_CLOSES, clock, lookOpen, phaseAt, setTestClock, testClock, useNow } from './lib/event'
+import { EVENT, LOOK_CLOSES, clock, lookOpen, phaseAt, setTestClock, testClock, useNow } from './lib/event'
 import { Install } from './components/Install'
 import { isInstalled } from './lib/install'
 import { useBack } from './lib/back'
@@ -84,6 +84,8 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [panel, setPanel] = useState(false)
   const [telao, setTelao] = useState(false)
+  // the opening screen (date, place, map) seen again from the sign-up form
+  const [start, setStart] = useState(false)
   const closeTelao = useCallback(() => setTelao(false), [])
   // which mission the photo being taken is for
   const [missionShot, setMissionShot] = useState<string>()
@@ -96,6 +98,7 @@ export default function App() {
   useEffect(() => holdUpdate(!!shot), [shot])
   useBack(panel, () => setPanel(false))
   useBack(telao, () => setTelao(false))
+  useBack(start && !guest, () => setStart(false))
   useBack(tab !== 'feed', () => setTab('feed'))
 
   // the organizer's dates and place
@@ -189,9 +192,10 @@ export default function App() {
         <Splash key="splash" onDone={() => setIntro(false)} />
       </AnimatePresence>
     )
-  if (phase === 'countdown' && !early)
+  if ((phase === 'countdown' && !early) || (start && !guest))
     return (
       <Countdown
+        onSignUp={phase === 'countdown' && !early ? undefined : () => setStart(false)}
         onOrganizer={(c) => {
           try {
             localStorage.setItem(ORG_KEY, c)
@@ -205,6 +209,7 @@ export default function App() {
   if (!guest) return (
       <Welcome
         code={code}
+        onStart={t < EVENT.start.getTime() ? () => setStart(true) : undefined}
         onBack={async (c) => setGuest(await comeBack(c))}
         onEnter={async (c, g) => {
           const me = await join(c, g)
