@@ -1,0 +1,116 @@
+name: Backup
+
+# Every night and on demand. The database is copied with the Supabase CLI (roles, schema, data), restored into a
+# local Supabase to prove the copy opens and has the same rows, then encrypted (AES-256, the passphrase only lives
+# in the secret) and kept as a workflow artifact for 30 days. With the R2 secrets, the photos' originals are also
+# copied to a second bucket; the copy only adds, so a photo deleted by mistake is still there.
+# Secrets (Settings › Secrets and variables › Actions):
+#   BACKUP_DB_URL      Supabase › Connect › Session pooler connection string, with the database password
+#   BACKUP_PASSPHRASE  a long random passphrase, also kept outside GitHub: without it the copy cannot be opened
+#   R2_BACKUP_ACCOUNT_ID, R2_BACKUP_KEY_ID, R2_BACKUP_SECRET  an R2 token that reads PHOTOS and writes COPY
+# This repository is public, so anyone signed in to GitHub can download the artifact: it is only ever the
+# encrypted file, useless without the passphrase.
+# Missing secrets: the job says so and ends green.
+on:
+  schedule:
+    - cron: '30 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: backup
+
+env:
+  PHOTOS: confra-fotos
+  COPY: confra-fotos-copia
+  LOCAL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+jobs:
+  banco:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DB: ${{ secrets.BACKUP_DB_URL }}
+      PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check the secrets
+        id: on
+        run: |
+          if [ -z "$DB" ] || [ -z "$PASS" ]; then
+            echo "::notice::Backup do banco desligado: falta BACKUP_DB_URL ou BACKUP_PASSPHRASE nos secrets."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: supabase/setup-cli@45a513f8c64c0bc8e0e3dfe572b5c95be85f6359 # v3.0.1
+        if: steps.on.outputs.go == 'true'
+        with:
+          version: latest
+      - name: Copy the database
+        if: steps.on.outputs.go == 'true'
+        run: |
+          mkdir -p copia
+          supabase db dump --db-url "$DB" -f copia/roles.sql --role-only
+          supabase db dump --db-url "$DB" -f copia/schema.sql
+          supabase db dump --db-url "$DB" -f copia/data.sql --use-copy --data-only
+          ls -l copia
+      - name: Restore it into a local Supabase
+        if: steps.on.outputs.go == 'true'
+        run: |
+          supabase init --force >/dev/null
+          supabase start -x studio,imgproxy,mailpit,logflare,vector,edge-runtime,supavisor,postgres-meta
+          psql "$LOCAL" -q --single-transaction -v ON_ERROR_STOP=1 \
+            -f copia/roles.sql -f copia/schema.sql -c 'SET session_replication_role = replica' -f copia/data.sql
+      - name: Compare the rows
+        if: steps.on.outputs.go == 'true'
+        run: |
+          for t in public.guests public.photos public.photo_faces public.missions public.invites auth.users; do
+            a=$(psql "$DB" -Atc "select count(*) from $t")
+            b=$(psql "$LOCAL" -Atc "select count(*) from $t")
+            echo "$t: banco $a, cópia $b"
+            # the party goes on while it copies: a few rows may come or go between the copy and the count
+            d=$((a > b ? a - b : b - a))
+            [ "$d" -le 50 ] || { echo "::error::$t: a cópia tem $b linhas e o banco $a"; exit 1; }
+          done
+      - name: Encrypt
+        if: steps.on.outputs.go == 'true'
+        run: |
+          tar -C copia -czf copia.tgz .
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 \
+            -o "banco-$(date -u +%Y%m%d-%H%M).tgz.gpg" copia.tgz <<< "$PASS"
+          rm -rf copia copia.tgz
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.on.outputs.go == 'true'
+        with:
+          name: banco-${{ github.run_id }}
+          path: banco-*.tgz.gpg
+          retention-days: 30
+          if-no-files-found: error
+
+  fotos:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      ACCOUNT: ${{ secrets.R2_BACKUP_ACCOUNT_ID }}
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET }}
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: 'true'
+    steps:
+      - name: Copy the photos to the second bucket
+        run: |
+          if [ -z "$ACCOUNT" ] || [ -z "$RCLONE_CONFIG_R2_ACCESS_KEY_ID" ] || [ -z "$RCLONE_CONFIG_R2_SECRET_ACCESS_KEY" ]; then
+            echo "::notice::Cópia das fotos desligada: faltam os secrets R2_BACKUP_*."
+            exit 0
+          fi
+          sudo apt-get install -y -qq rclone >/dev/null
+          export RCLONE_CONFIG_R2_ENDPOINT="https://$ACCOUNT.r2.cloudflarestorage.com"
+          # copy, never sync: nothing is ever removed from the second bucket
+          rclone copy "r2:$PHOTOS" "r2:$COPY" --transfers 16 --checkers 32 --stats-one-line --stats 60s
+          a=$(rclone size "r2:$PHOTOS" --json)
+          b=$(rclone size "r2:$COPY" --json)
+          echo "fotos: $a"
+          echo "cópia: $b"
+          [ "$(jq .count <<< "$b")" -ge "$(jq .count <<< "$a")" ] || { echo "::error::a cópia tem menos arquivos que o bucket"; exit 1; }
