@@ -1,0 +1,34 @@
+name: Telas
+
+# Writes the approved pictures of the guest's screens (e2e/telas/, see e2e/telas.visual.ts) with CI's own
+# browser and puts them on the branch "telas-aprovadas", to be merged with a PR. Run by hand (Actions › Telas ›
+# Run workflow) after a change in the look; the pictures from other browsers would never match CI's.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  telas:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run telas -- --update-snapshots=all
+        env:
+          CI: '1'
+      - name: Put them on a branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c telas-aprovadas
+          git add e2e/telas
+          git commit -m 'test(telas): fotos aprovadas das telas' || exit 0
+          git push -f origin telas-aprovadas

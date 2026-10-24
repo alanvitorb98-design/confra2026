@@ -4,9 +4,8 @@ import { cameraPhoto } from './steps'
 
 // Pictures of the screens every guest sees, compared with the approved ones in e2e/telas/. A change in the
 // look (a font that stopped loading, a button pushed off the screen, a broken color) fails here even when
-// every button still works. Runs with npm run telas. The approved pictures come from CI (a missing one is
-// written there and kept as the run's "telas" file); to approve a new look, delete the old picture in the
-// PR and commit the one CI writes.
+// every button still works. Runs on every PR (npm run telas). The approved pictures come from CI's own
+// browser: Actions › Telas › Run workflow writes them on the branch "telas-aprovadas", merged with a PR.
 const DURING = new Date('2026-11-07T11:00:00-03:00')
 
 const look = (page: Page, name: string) =>
