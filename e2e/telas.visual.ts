@@ -8,13 +8,22 @@ import { cameraPhoto } from './steps'
 // browser: Actions › Telas › Run workflow writes them on the branch "telas-aprovadas", merged with a PR.
 const DURING = new Date('2026-11-07T11:00:00-03:00')
 
-const look = (page: Page, name: string) =>
-  expect(page).toHaveScreenshot(`${name}.png`, { fullPage: false, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 })
+// The entrances run on the motion library, which Playwright can't freeze, and some start only after a delay
+// (the "Entrar" button waits 1.7 s, invisible but already "visible" to Playwright): wait them all out first.
+const look = async (page: Page, name: string) => {
+  await page.waitForTimeout(3000)
+  await expect(page).toHaveScreenshot(`${name}.png`, { fullPage: false, animations: 'disabled', caret: 'hide', maxDiffPixelRatio: 0.01 })
+}
 
 test('the screens a guest goes through look as approved', async ({ page }) => {
   await fakeBackend(page)
-  // the clock stands still at the same minute of the party, so countdowns and "há 1 min" never change
-  await page.clock.setFixedTime(DURING)
+  // the party's clock, faked whole (Date, timers, frames, performance.now) so the motion library sees one time:
+  // with only Date frozen, its entrances stopped at a different point on each run
+  await page.clock.install({ time: DURING })
+  // every new photo gets a random tilt; the pictures need the same one each time
+  await page.addInitScript(() => {
+    Math.random = () => 0.5
+  })
   await page.goto('/')
   await expect(page.getByRole('button', { name: 'Continuar no navegador' })).toBeVisible()
   await page.evaluate(() => document.fonts.ready)
