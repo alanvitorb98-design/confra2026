@@ -14,6 +14,10 @@ export const EVENT = {
   lng: null as number | null,
   /** the organizer let only invited guests sign up (personal invitation or the event code) */
   inviteOnly: false,
+  /** the organizer's switches for the day: face recognition, the missions tab, the ranking tab */
+  facesOn: true,
+  missionsOn: true,
+  rankingOn: true,
 }
 
 /** The app opens one day before the party */
@@ -36,6 +40,9 @@ export interface EventConfig {
   lat?: number | null
   lng?: number | null
   invite_only?: boolean
+  faces_on?: boolean
+  missions_on?: boolean
+  ranking_on?: boolean
   /** the server's clock when it answered */
   now?: string
 }
@@ -50,6 +57,10 @@ export function applyConfig(c: EventConfig, cache = true) {
   LOOK_OPENS = date(c.look_opens, LOOK_OPENS)
   LOOK_CLOSES = date(c.look_closes, LOOK_CLOSES)
   EVENT.inviteOnly = !!c.invite_only
+  // an older server says nothing about the switches: everything on
+  EVENT.facesOn = c.faces_on !== false
+  EVENT.missionsOn = c.missions_on !== false
+  EVENT.rankingOn = c.ranking_on !== false
   // the place only comes with the code: never forget it because a later answer came without
   if (c.place) {
     EVENT.place = c.place

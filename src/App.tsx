@@ -58,7 +58,9 @@ function loadGuest(): Guest | null {
 export default function App() {
   const [guest, setGuest] = useState<Guest | null>(loadGuest)
   // where the guest was survives a reload or the phone reopening the app
-  const [tab, setTab] = useSessionState<Tab>(storageKey('tab'), 'feed')
+  const [chosenTab, setTab] = useSessionState<Tab>(storageKey('tab'), 'feed')
+  // a tab the organizer switched off for the day shows the feed instead
+  const tab: Tab = (chosenTab === 'missions' && !EVENT.missionsOn) || (chosenTab === 'ranking' && !EVENT.rankingOn) ? 'feed' : chosenTab
   const [wall, setWall] = useSessionState<Wall>(storageKey('wall'), 'party')
   const [shot, setShot] = useState<File | null>(null)
   const [open, setOpen] = useState<Photo | null>(null)
@@ -245,6 +247,7 @@ export default function App() {
         code={code}
         invite={invite}
         inviteOnly={EVENT.inviteOnly}
+        askFace={EVENT.facesOn}
         autoBack={returnCode || undefined}
         onAs={async (t, id) => setGuest(await joinAs(t, id))}
         onStart={t < EVENT.start.getTime() ? () => setStart(true) : undefined}
@@ -391,7 +394,7 @@ export default function App() {
 
       <nav className="tabbar">
         <button aria-current={tab === 'feed'} onClick={() => go('feed')}><TabIcon name="feed" active={tab === 'feed'} />Feed</button>
-        <button aria-current={tab === 'missions'} onClick={() => go('missions')}><TabIcon name="missions" active={tab === 'missions'} />Missões</button>
+        <button aria-current={tab === 'missions'} onClick={() => go('missions')} className={EVENT.missionsOn ? undefined : 'tab-off'} disabled={!EVENT.missionsOn} aria-hidden={!EVENT.missionsOn}><TabIcon name="missions" active={tab === 'missions'} />Missões</button>
         <div className="shoot-slot">
           <Shutter onShoot={() => shoot()} disabled={!canShoot} label={shootKind === 'look' ? 'Postar meu look' : 'Tirar foto'} />
           <button className="gallery-pick" onClick={() => shoot(undefined, true)} disabled={!canShoot} aria-label="Escolher da galeria">
@@ -403,7 +406,7 @@ export default function App() {
             </svg>
           </button>
         </div>
-        <button aria-current={tab === 'ranking'} onClick={() => go('ranking')}><TabIcon name="ranking" active={tab === 'ranking'} />Ranking</button>
+        <button aria-current={tab === 'ranking'} onClick={() => go('ranking')} className={EVENT.rankingOn ? undefined : 'tab-off'} disabled={!EVENT.rankingOn} aria-hidden={!EVENT.rankingOn}><TabIcon name="ranking" active={tab === 'ranking'} />Ranking</button>
         <button aria-current={tab === 'me'} onClick={() => go('me')}><TabIcon name="me" active={tab === 'me'} />Eu</button>
       </nav>
 

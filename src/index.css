@@ -684,3 +684,6 @@ button.phasebar-test { border: 0; cursor: pointer; font-family: inherit; font-we
 .update-card { width: 100%; max-width: 360px; display: grid; gap: 12px; padding: 24px 20px; border-radius: 22px; background: var(--paper); color: var(--ink); text-align: center; box-shadow: 0 20px 60px rgb(0 0 0 / .45); }
 .update-card b { font-family: var(--display); font-size: 24px; font-weight: 400; line-height: 1.15; }
 .update-card p { margin: 0; font-size: 15px; line-height: 1.45; opacity: .85; }
+
+/* a tab the organizer switched off keeps its place, so the shutter stays in the middle */
+.tabbar .tab-off { visibility: hidden; }

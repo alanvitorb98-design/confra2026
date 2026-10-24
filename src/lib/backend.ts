@@ -365,6 +365,10 @@ export interface AdminEvent {
   test_mode: boolean
   /** only invited guests sign up (personal invitation or the event code) */
   invite_only: boolean
+  /** switches for the day: face recognition, the missions tab, the ranking tab */
+  faces_on: boolean
+  missions_on: boolean
+  ranking_on: boolean
   /** missions with people: on, the biggest group drawn, and how many guests the party needs before they start */
   gen_missions: boolean
   gen_max_people: number
