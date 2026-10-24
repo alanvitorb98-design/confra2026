@@ -40,6 +40,29 @@ test('a guest gets from the link to the countdown, after accepting the terms', a
   expect(errors).toEqual([])
 })
 
+test('the countdown follows the organizer moving the opening earlier', async ({ page }) => {
+  let opens = event.app_opens
+  const calls = await fakeBackend(page, { event_public: () => ({ ...event, app_opens: opens }) })
+  await openInBrowser(page)
+  await expect(page.getByRole('button', { name: 'Sou da organização' })).toBeVisible({ timeout: 15_000 })
+  // the organizer opens the app now, in the panel; the guest's phone is still on the countdown
+  opens = '2026-10-20T11:00:00-03:00'
+  const before = calls.filter((c) => c.fn === 'event_public').length
+  await page.clock.fastForward('05:01')
+  await expect.poll(() => calls.filter((c) => c.fn === 'event_public').length).toBeGreaterThan(before)
+  await expect(page.getByRole('button', { name: 'Entrar na festa' })).toBeVisible({ timeout: 15_000 })
+})
+
+test('coming back to the app reads the party times again', async ({ page }) => {
+  const calls = await fakeBackend(page)
+  await openInBrowser(page)
+  await expect(page.getByRole('button', { name: 'Sou da organização' })).toBeVisible({ timeout: 15_000 })
+  await page.clock.fastForward('01:01')
+  const before = calls.filter((c) => c.fn === 'event_public').length
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
+  await expect.poll(() => calls.filter((c) => c.fn === 'event_public').length).toBe(before + 1)
+})
+
 test('the organizer box covers what is behind it', async ({ page }) => {
   await openInBrowser(page)
   await page.getByRole('button', { name: 'Sou da organização' }).click({ timeout: 15_000 })

@@ -105,14 +105,28 @@ export default function App() {
   useBack(start && !guest, () => setStart(false))
   useBack(tab !== 'feed', () => setTab('feed'))
 
-  // the organizer's dates and place
   // daily reminders: re-register this phone if the push service dropped it
   useEffect(() => {
     healPush()
   }, [])
 
+  // the organizer's dates and place: read on opening, every few minutes and when the guest comes back to the app,
+  // so a change in the panel reaches a phone still on the countdown or the sign-up form
   useEffect(() => {
-    loadEvent(code).then((ok) => ok && setConfigLoaded((n) => n + 1))
+    let last = 0
+    const read = () => {
+      if (Date.now() - last < 60_000) return
+      last = Date.now()
+      loadEvent(code).then((ok) => ok && setConfigLoaded((n) => n + 1))
+    }
+    read()
+    const every = setInterval(read, 5 * 60_000)
+    const back = () => document.visibilityState === 'visible' && read()
+    document.addEventListener('visibilitychange', back)
+    return () => {
+      clearInterval(every)
+      document.removeEventListener('visibilitychange', back)
+    }
   }, [code])
 
   useEffect(() => {
