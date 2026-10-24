@@ -46,7 +46,9 @@ export async function fakeBackend(page: Page, rpc: Record<string, unknown> = {})
       // `join` in the answers decides per call: { status, json? } fails it, { json } adds to the answer
       const out = (typeof answers.join === 'function' ? (answers.join as (b: unknown) => unknown)(body) : null) as { status?: number; json?: object } | null
       if (out?.status) return route.fulfill({ status: out.status, json: out.json ?? { error: 'falha simulada' } })
-      return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'teste', guest_id: GUEST_ID, ...out?.json } })
+      // like the real one: the guest's name comes back too (on a código de volta, the one on the account)
+      const name = (body as { name?: string } | null)?.name ?? 'Ana Teste'
+      return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'teste', guest_id: GUEST_ID, name, ...out?.json } })
     }
     if (url.pathname === '/auth/v1/user') return route.fulfill({ json: USER })
     // links to the photos: one per path asked, pointing nowhere

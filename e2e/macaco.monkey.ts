@@ -22,8 +22,14 @@ function random(seed: number) {
 
 const WORDS = ['oi', 'Ana Souza', '😂🔥', '', '   ', 'a'.repeat(200), '<b>x</b>', "'; drop table", '@perfil', '123456']
 
-test(`monkey: ${MS / 1000}s of random taps (seed ${SEED})`, async ({ page }) => {
-  test.setTimeout(MS + 120_000)
+// no trace: minutes of random taps make a huge one, slow CI's robot down to a third and can outlast the
+// test's time while it is written; the seed in the log repeats the run instead
+test.use({ trace: 'off' })
+
+// the title stays the same in every process: the runner and its worker each pick a seed when none is given
+test('monkey: random taps', async ({ page }) => {
+  test.setTimeout(MS + 180_000)
+  console.log(`semente ${SEED}, ${MS / 1000} s`)
   const rnd = random(SEED)
   const pick = <T,>(xs: T[]) => xs[Math.floor(rnd() * xs.length)]
   const errors: string[] = []
