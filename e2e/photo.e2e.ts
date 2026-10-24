@@ -84,6 +84,34 @@ test('a photo that fails to publish stays on the phone and goes out after the ap
   expect(ids.size).toBe(1)
 })
 
+test('a photo still developing comes back after the app closes, and is gone once discarded', async ({ page }) => {
+  const calls = await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  await page.locator('#camera').setInputFiles(await cameraPhoto(page))
+  await expect(page.locator('.develop-polaroid img.develop-sharp')).toBeVisible({ timeout: 10_000 })
+  // the phone drops the app in the background while the guest answers a message
+  await page.reload()
+  await expect(page.locator('.develop-polaroid img.develop-sharp')).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Cancelar' }).click()
+  await expect(page.locator('.develop-polaroid')).toHaveCount(0)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.develop-polaroid')).toHaveCount(0)
+  expect(calls.filter((c) => c.fn === 'send_photo')).toHaveLength(0)
+})
+
+test('a posted photo does not come back on the developing screen', async ({ page }) => {
+  const calls = await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  await takeAndPost(page)
+  await expect.poll(() => calls.filter((c) => c.fn === 'send_photo').length, { timeout: 15_000 }).toBe(1)
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+  await expect(page.locator('.develop-polaroid')).toHaveCount(0)
+})
+
 test('the back button closes what is on top instead of leaving the app', async ({ page }) => {
   await fakeBackend(page)
   await page.clock.install({ time: DURING })

@@ -1144,15 +1144,17 @@ export function useParty(me: Guest | null, peopleOn = false) {
     }
     const l: Local = { file, url: URL.createObjectURL(file), preview, row, status: 'sending' }
     // kept on the phone first, so the photo survives the app closing before it is sent
-    void fetch(preview)
+    const kept = fetch(preview)
       .then((r) => r.blob())
       .then((blob) => outbox.keep({ id, guest: me.id, row, file, fileName: file.name, preview: blob, at: Date.now() }))
       .catch(() => false)
-      .then((kept) => {
-        // the phone could not hold it (full or private mode): if this send fails, closing the app loses it
-        if (!kept) note('outbox', new Error('não guardou no celular'))
-        return send(kept ? l : { ...l, unsafe: true })
-      })
+    void kept.then((ok) => {
+      // the phone could not hold it (full or private mode): if this send fails, closing the app loses it
+      if (!ok) note('outbox', new Error('não guardou no celular'))
+      return send(ok ? l : { ...l, unsafe: true })
+    })
+    // resolves once the photo is on the phone's list to send
+    return kept
   }
 
   const retry = (id: string) => {
