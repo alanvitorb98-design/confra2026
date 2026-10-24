@@ -9,6 +9,8 @@
 //                     1080px copy and thumbnail at once, each only good for that exact size and type; the copies'
 //                     7-day viewing links wait in r2_links for the photo row
 //   op=renew (POST)   anyone (daily job): signs again the viewing links that expire within 2 days
+//   op=forget (POST)  anyone (daily job): deletes from the app's bucket the files the database queued in
+//                     apagar_arquivos (selfies after the party or when a guest leaves the recognition)
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { AwsClient, AwsV4Signer } from 'npm:aws4fetch@1.0.20'
 
@@ -109,6 +111,21 @@ Deno.serve(async (req) => {
   const url = new URL(req.url)
   const op = url.searchParams.get('op')
   if (op === 'status') return json({ ready: await ready(), keys })
+  // only paths the database queued are deleted, so anyone may ask; works without R2 too
+  if (op === 'forget' && req.method === 'POST') {
+    let removed = 0
+    for (let page = 0; page < 20; page++) {
+      const { data: rows } = await db.from('apagar_arquivos').select('path').order('at').limit(500)
+      const paths = (rows ?? []).map((r) => r.path as string)
+      if (!paths.length) break
+      const { error } = await db.storage.from('fotos').remove(paths)
+      if (error) return json({ error: error.message, removed }, 500)
+      await db.from('apagar_arquivos').delete().in('path', paths)
+      removed += paths.length
+      if (paths.length < 500) break
+    }
+    return json({ removed })
+  }
   if (!r2) return json({ error: 'R2 ainda não configurado' }, 503)
   if (req.method !== 'POST') return json({ error: 'use POST' }, 405)
 

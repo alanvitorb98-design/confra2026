@@ -60,14 +60,17 @@ Deno.serve(async (req) => {
 
   // guessing a código de volta, an invitation or the event code: each try is written down before counting
   // (tries sent all at once each count the others), per network and by everyone together
-  const tooManyGuesses = async () => {
-    const tag = `volta:${ip}`
-    await admin.from('join_attempts').insert({ ip: tag })
+  const guessTag = `volta:${ip}`
+  const pastTheLimit = async () => {
     const [{ count: tries }, { count: all }] = await Promise.all([
-      admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', tag).gte('at', since),
+      admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', guessTag).gte('at', since),
       admin.from('join_attempts').select('*', { count: 'exact', head: true }).like('ip', 'volta:%').gte('at', since),
     ])
     return (tries ?? 0) > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL
+  }
+  const tooManyGuesses = async () => {
+    await admin.from('join_attempts').insert({ ip: guessTag })
+    return pastTheLimit()
   }
   const findInvite = async (token: string) => {
     if (token.length !== 10) return null
@@ -171,6 +174,17 @@ Deno.serve(async (req) => {
   // with "só com convite" on, a new guest needs an invitation with a free seat or the event code
   const inv = inviteToken ? await findInvite(inviteToken) : null
   let inviteId = inv && !inv.revoked && inv.people.length < inv.seats ? inv.id : null
+  const eventCode = async () => cleanCode((await admin.from('event_secret').select('code').maybeSingle()).data?.code)
+  // an invitation or event code sent along with the sign-up is a guess like the ones above: a wrong one is
+  // written down, and past the limit even a right one waits. Only wrong ones count, so a whole party on the
+  // venue's Wi-Fi coming in with good invitations never gets near the limit.
+  if (inviteToken || cleanCode(body.code)) {
+    const right = (!!inv && !inv.revoked) || (!!cleanCode(body.code) && cleanCode(body.code) === (await eventCode()))
+    if (right ? await pastTheLimit() : await tooManyGuesses()) {
+      if (keyMine) await admin.from('join_keys').delete().eq('key', key)
+      return reply(429, { error: 'muitas tentativas' })
+    }
+  }
   // without a seat on an invitation: allowed unless "só com convite" is on and the event code is wrong
   const openDoor = async () => {
     const [{ data: cfg }, { data: sec }] = await Promise.all([
