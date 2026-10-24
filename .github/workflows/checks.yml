@@ -27,6 +27,11 @@ jobs:
       - run: npm run e2e
         env:
           CI: '1'
+      # pictures of the guest's screens against the approved ones in e2e/telas/ (written by the Telas
+      # workflow; a missing one only passes, see e2e/telas.visual.ts)
+      - run: npm run telas -- --update-snapshots=missing
+        env:
+          CI: '1'
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:

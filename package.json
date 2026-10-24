@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "e2e": "playwright test",
-    "macaco": "MACACO=1 playwright test"
+    "macaco": "MACACO=1 playwright test",
+    "telas": "TELAS=1 playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",

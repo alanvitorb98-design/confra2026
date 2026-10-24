@@ -4,8 +4,10 @@ import { defineConfig, devices } from '@playwright/test'
 // (nothing reaches the real Supabase). PW_CHROMIUM points at a preinstalled Chromium when there is one.
 export default defineConfig({
   testDir: 'e2e',
-  // the monkey test (e2e/macaco.monkey.ts) runs only when asked: npm run macaco
-  testMatch: process.env.MACACO ? '*.monkey.ts' : '*.e2e.ts',
+  // the monkey test (e2e/macaco.monkey.ts) runs only when asked: npm run macaco; the screen pictures
+  // (e2e/telas.visual.ts) with npm run telas
+  testMatch: process.env.MACACO ? '*.monkey.ts' : process.env.TELAS ? '*.visual.ts' : '*.e2e.ts',
+  snapshotPathTemplate: '{testDir}/telas/{arg}{ext}',
   fullyParallel: true,
   // the monkey runs once: a retry would be another random run, not the same one
   retries: process.env.CI && !process.env.MACACO ? 1 : 0,
