@@ -1069,6 +1069,25 @@ AS $function$
 $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.guests_invite_seat()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare s int; gone timestamptz;
+begin
+  if new.invite_id is null then return new; end if;
+  if tg_op = 'UPDATE' and new.invite_id is not distinct from old.invite_id then return new; end if;
+  select seats, revoked_at into s, gone from public.invites where id = new.invite_id for update;
+  if not found or gone is not null then raise exception 'convite'; end if;
+  if (select count(*) from public.guests where invite_id = new.invite_id and id <> new.id) >= s then
+    raise exception 'cheio';
+  end if;
+  return new;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.invite_peek(p_token text)
  RETURNS jsonb
  LANGUAGE sql
@@ -1865,6 +1884,8 @@ end $$;
 
 CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.event_config FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
 
+CREATE TRIGGER guests_invite_seat BEFORE INSERT OR UPDATE OF invite_id ON public.guests FOR EACH ROW EXECUTE FUNCTION guests_invite_seat();
+
 CREATE TRIGGER guests_rostos_chamar AFTER INSERT OR UPDATE OF selfie_path, face_status ON public.guests FOR EACH ROW WHEN (((new.face_status = 'pending'::text) AND (new.selfie_path IS NOT NULL))) EXECUTE FUNCTION rostos_chamar_trg();
 
 CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.missions FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
@@ -2200,6 +2221,8 @@ revoke all on function public.my_face_progress() from public, anon, authenticate
 revoke all on function public.my_guest() from public, anon, authenticated;
 
 revoke all on function public.guest_name_taken(p_name text) from public, anon, authenticated;
+
+revoke all on function public.guests_invite_seat() from public, anon, authenticated;
 
 revoke all on function public.invite_peek(p_token text) from public, anon, authenticated;
 
