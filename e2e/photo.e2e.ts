@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page, type Route } from '@playwright/test'
 import { event, fakeBackend } from './backend'
 
 // the photo's whole way: sign up during the party, take it, reveal it, post it
@@ -96,6 +96,23 @@ test('a photo that fails to publish stays on the phone and goes out after the ap
   // the same photo id both times: the server keeps one copy
   const ids = new Set(calls.filter((c) => c.fn === 'send_photo').map((c) => (c.body as { p_id: string }).p_id))
   expect(ids.size).toBe(1)
+})
+
+test('without internet the photo says it is kept on the phone, and goes once the signal is back', async ({ page, context }) => {
+  const calls = await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  // the phone loses signal: every request fails before reaching a server
+  const cut = (route: Route) => route.abort('internetdisconnected')
+  await page.route(/supabase\.co\//, cut)
+  await context.setOffline(true)
+  await takeAndPost(page)
+  await expect(page.getByText('Guardada no celular. Sobe sozinha quando a internet voltar.')).toBeVisible({ timeout: 15_000 })
+  expect(calls.filter((c) => c.fn === 'send_photo')).toHaveLength(0)
+  await page.unroute(/supabase\.co\//, cut)
+  await context.setOffline(false)
+  await expect.poll(() => calls.filter((c) => c.fn === 'send_photo').length, { timeout: 20_000 }).toBe(1)
+  await expect(page.getByText('Guardada no celular. Sobe sozinha quando a internet voltar.')).toHaveCount(0)
 })
 
 test('a photo still developing comes back after the app closes, and is gone once discarded', async ({ page }) => {

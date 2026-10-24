@@ -843,6 +843,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
       bytes: row.bytes ?? l?.file.size,
       status: l?.status === 'sent' ? undefined : l?.status,
       problem: l?.status === 'failed' ? l.problem : undefined,
+      kept: l?.status === 'failed' && !l.unsafe && !l.problem,
       reactions: counts.get(row.id) ?? { '🔥': 0, '😂': 0, '😍': 0, '🥂': 0 },
       mine: mine.get(row.id) ?? {},
       missionId: row.mission_id ?? undefined,
