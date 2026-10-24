@@ -944,7 +944,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
     let alive = true
     call<{ id: string | null; need?: number; off?: boolean }>('people_mission').then(
       (r) => {
-        if (!alive) return
+        // an empty answer (a proxy, an older server) is no mission, not a crash
+        if (!alive || !r) return
         setPeopleNeed(r.id ? undefined : r.need)
         setPeopleOff(!!r.off)
       },
