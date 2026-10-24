@@ -683,6 +683,8 @@ AS $function$
 declare s public.event_secret;
 begin
   if auth.uid() is null then return false; end if;
+  -- one guess at a time per login: guesses sent all at once each counted before the others were written down
+  perform pg_advisory_xact_lock(hashtext('claim_admin:' || auth.uid()));
   if (select count(*) from public.admin_attempts where user_id = auth.uid() and at > now() - interval '1 hour') >= 5 then
     raise exception 'muitas tentativas, tenta de novo daqui a pouco';
   end if;
