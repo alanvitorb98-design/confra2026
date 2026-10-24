@@ -17,6 +17,11 @@ create table public.admin_attempts (
   at timestamp with time zone default now() not null
 );
 
+create table public.apagar_arquivos (
+  path text not null,
+  at timestamp with time zone default now() not null
+);
+
 create table public.client_errors (
   id bigint generated always as identity not null,
   guest_id uuid,
@@ -47,7 +52,8 @@ create table public.event_config (
   invite_only boolean default false not null,
   faces_on boolean default true not null,
   missions_on boolean default true not null,
-  ranking_on boolean default true not null
+  ranking_on boolean default true not null,
+  faces_forgotten_at timestamp with time zone
 );
 
 create table public.event_secret (
@@ -250,6 +256,7 @@ alter table public.event_secret add constraint event_secret_pkey PRIMARY KEY (id
 alter table public.face_extra add constraint face_extra_pkey PRIMARY KEY (guest_id, photo_id);
 
 alter table public.face_refs add constraint face_refs_pkey PRIMARY KEY (guest_id);
+alter table public.apagar_arquivos add constraint apagar_arquivos_pkey PRIMARY KEY (path);
 
 alter table public.face_vectors add constraint face_vectors_pkey PRIMARY KEY (photo_id, idx);
 
@@ -663,6 +670,43 @@ begin
 end $function$
 ;
 
+CREATE OR REPLACE FUNCTION public.forget_faces(p_off boolean)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  insert into public.apagar_arquivos (path)
+  select selfie_path from public.guests where selfie_path is not null
+  union
+  select regexp_replace(original_path, '\.[^./]+$', '') || '-f.jpg' from public.photos
+  where kind = 'party' and faces_status in ('pending', 'failed')
+  on conflict (path) do nothing;
+  update public.face_refs set embedding = null, updated_at = now() where embedding is not null;
+  update public.face_extra set embedding = null where embedding is not null;
+  delete from public.face_vectors;
+  update public.photo_faces set score = -1 where score > 0 and by_hand is null;
+  update public.photo_spots set guest_id = null where guest_id is not null and not by_hand;
+  update public.guests set face_status = 'none', selfie_path = null where face_status <> 'none' or selfie_path is not null;
+  update public.photos set faces_status = 'skip' where faces_status in ('pending', 'failed');
+  if p_off then update public.event_config set faces_on = false, faces_forgotten_at = now() where id; end if;
+end $function$
+;
+
+CREATE OR REPLACE FUNCTION public.forget_faces_when_due()
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+begin
+  if exists (select 1 from public.event_config where party_ends < now() - interval '7 days' and faces_forgotten_at is null) then
+    perform public.forget_faces(true);
+  end if;
+end $function$
+;
+
 CREATE OR REPLACE FUNCTION public.admin_wipe_faces()
  RETURNS void
  LANGUAGE plpgsql
@@ -671,12 +715,7 @@ CREATE OR REPLACE FUNCTION public.admin_wipe_faces()
 AS $function$
 begin
   if not public.is_admin() then raise exception 'só organizador'; end if;
-  update public.face_refs set embedding = null, updated_at = now() where embedding is not null;
-  update public.face_extra set embedding = null where embedding is not null;
-  update public.photo_faces set score = -1 where score > 0 and by_hand is null;
-  update public.photo_spots set guest_id = null where guest_id is not null and not by_hand;
-  update public.guests set face_status = 'none', selfie_path = null where face_status <> 'none' or selfie_path is not null;
-  update public.photos set faces_status = 'skip' where faces_status = 'pending';
+  perform public.forget_faces(false);
 end $function$
 ;
 
@@ -817,6 +856,9 @@ AS $function$
 declare g uuid;
 begin
   g := public.my_guest();
+  insert into public.apagar_arquivos (path)
+  select selfie_path from public.guests where id = g and selfie_path is not null
+  on conflict (path) do nothing;
   update public.guests set face_opt_in = false, face_status = 'none', selfie_path = null where id = g;
   update public.face_refs set embedding = null, updated_at = now() where guest_id = g;
   update public.face_extra set embedding = null where guest_id = g and embedding is not null;
@@ -1923,6 +1965,8 @@ CREATE TRIGGER photos_touch BEFORE UPDATE ON public.photos FOR EACH ROW EXECUTE 
 CREATE TRIGGER live_mark AFTER INSERT OR DELETE OR UPDATE ON public.reactions FOR EACH STATEMENT EXECUTE FUNCTION live_mark();
 
 alter table public.admin_attempts enable row level security;
+alter table public.apagar_arquivos enable row level security;
+create policy so_servidor on public.apagar_arquivos for all to anon, authenticated using (false) with check (false);
 
 alter table public.client_errors enable row level security;
 
@@ -1995,6 +2039,7 @@ using ((select realtime.topic()) = 'live' and extension = 'broadcast' and (selec
 create policy "upload into a guest folder" on storage.objects as permissive for insert to authenticated with check (((bucket_id = 'fotos'::text) AND ((storage.foldername(name))[1] = ANY (ARRAY['party'::text, 'look'::text, 'selfie'::text])) AND ((storage.foldername(name))[2] = (( SELECT my_guest() AS my_guest))::text) AND ( SELECT upload_quota_ok() AS upload_quota_ok)));
 
 revoke all on public.admin_attempts from public, anon, authenticated;
+revoke all on public.apagar_arquivos from public, anon, authenticated;
 
 revoke all on public.client_errors from public, anon, authenticated;
 
@@ -2177,6 +2222,8 @@ revoke all on function public.admin_stats() from public, anon, authenticated;
 revoke all on function public.admin_update_event(p jsonb) from public, anon, authenticated;
 
 revoke all on function public.admin_wipe_faces() from public, anon, authenticated;
+revoke all on function public.forget_faces(boolean) from public, anon, authenticated;
+revoke all on function public.forget_faces_when_due() from public, anon, authenticated;
 
 revoke all on function public.claim_admin(p_code text) from public, anon, authenticated;
 
