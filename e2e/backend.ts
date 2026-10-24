@@ -64,5 +64,8 @@ export async function fakeBackend(page: Page, rpc: Record<string, unknown> = {})
     if (url.pathname.startsWith('/realtime/')) return route.abort()
     return route.fulfill({ json: {} })
   })
+  // page.route never sees WebSockets: without this the live channel reached the real project with the fake
+  // token above (rejected there as "JwtSignatureError"). Closed here, the app falls back to asking for news.
+  await page.routeWebSocket(/supabase\.co\//, (ws) => ws.close())
   return calls
 }
