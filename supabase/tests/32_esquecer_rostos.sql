@@ -8,9 +8,9 @@ insert into public.face_vectors (photo_id, idx, embedding)
   values ('32000000-0000-0000-0000-000000000001', 0, array_fill(0.1::real, array[512])::extensions.vector);
 insert into public.face_refs (guest_id, embedding)
   values ('10000000-0000-0000-0000-00000000000a', array_fill(0.1::real, array[512])::extensions.vector);
-update public.guests set selfie_path = 'selfie/10000000-0000-0000-0000-00000000000a/1.jpg', face_status = 'done'
+update public.guests set selfie_path = 'selfie/10000000-0000-0000-0000-00000000000a/1.jpg', face_status = 'ready'
   where name = 'Ana';
-update public.guests set selfie_path = 'selfie/10000000-0000-0000-0000-00000000000b/1.jpg', face_status = 'done'
+update public.guests set selfie_path = 'selfie/10000000-0000-0000-0000-00000000000b/1.jpg', face_status = 'ready'
   where name = 'Bia';
 
 do $$ begin
