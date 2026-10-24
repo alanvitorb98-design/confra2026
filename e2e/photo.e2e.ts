@@ -143,6 +143,27 @@ test('a posted photo does not come back on the developing screen', async ({ page
   await expect(page.locator('.develop-polaroid')).toHaveCount(0)
 })
 
+test("the organizer's switches pause recognition and hide the missions and ranking tabs", async ({ page }) => {
+  const calls = await fakeBackend(page, { event_public: { ...event, faces_on: false, missions_on: false, ranking_on: false } })
+  await page.clock.install({ time: DURING })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
+  await page.locator('.splash-go').click()
+  const terms = page.getByRole('dialog', { name: 'Combinados da festa' })
+  await terms.getByLabel('Li e topo os combinados').check()
+  await terms.getByRole('button', { name: 'Entrar' }).click()
+  await page.getByLabel('Nome e sobrenome').fill('Ana Teste')
+  // recognition paused: nobody is asked for a selfie
+  await expect(page.getByRole('button', { name: 'Topo!' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Entrar na festa' }).click()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+  expect((calls.find((c) => c.fn === 'join')!.body as { face?: boolean }).face).toBe(false)
+  const tabs = page.locator('.tabbar')
+  await expect(tabs.getByRole('button', { name: 'Missões' })).toBeHidden()
+  await expect(tabs.getByRole('button', { name: 'Ranking' })).toBeHidden()
+  await expect(tabs.getByRole('button', { name: 'Eu' })).toBeVisible()
+})
+
 test('the back button closes what is on top instead of leaving the app', async ({ page }) => {
   await fakeBackend(page)
   await page.clock.install({ time: DURING })

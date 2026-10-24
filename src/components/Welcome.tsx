@@ -16,6 +16,8 @@ interface Props {
   invite: string
   /** the organizer let only invited guests sign up */
   inviteOnly: boolean
+  /** face recognition is on: the guest is asked for a selfie (the organizer can pause it for the day) */
+  askFace: boolean
   /** a código de volta from the QR the organizer showed (?v=): used right away */
   autoBack?: string
   onEnter: (code: string, g: NewGuest, sameName: boolean) => Promise<void>
@@ -29,7 +31,7 @@ interface Props {
 const NO_NET = 'Não deu pra entrar agora. Confere a internet e tenta de novo.'
 const BUSY = 'Muitas tentativas. Espera um pouco e tenta de novo.'
 
-export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, autoBack, onEnter, onBack, onAs, onStart }: Props) {
+export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, askFace, autoBack, onEnter, onBack, onAs, onStart }: Props) {
   const [back, setBack] = useState(!!autoBack)
   const [code, setCode] = useState(linkCode)
   const [invite, setInvite] = useState(linkInvite)
@@ -42,7 +44,8 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, autoBa
   const [refused, setRefused] = useState<'code' | 'full'>()
   const [name, setName] = useState('')
   const [instagram, setInstagram] = useState('')
-  const [faceOptIn, setFaceOptIn] = useState(true)
+  const [wantsFace, setFaceOptIn] = useState(true)
+  const faceOptIn = askFace && wantsFace
   const [selfieUrl, setSelfieUrl] = useState<string>()
   const [cam, setCam] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -178,20 +181,22 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, autoBa
           <input id="instagram" value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@seu.perfil" autoCapitalize="none" />
         </label>
 
-        <div className="consent">
-          <b>Bora brincar de paparazzi?</b>
-          <p>Pra valer as missões e o ranking de quem mais aparece, a gente reconhece seu rosto nas fotos. Seu rosto só é usado {BRAND.faceScope} e é apagado depois da festa.</p>
-          <div className="consent-choice">
-            <button type="button" className={`chip${faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(true)}>Topo!</button>
-            <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>
+        {askFace && (
+          <div className="consent">
+            <b>Bora brincar de paparazzi?</b>
+            <p>Pra valer as missões e o ranking de quem mais aparece, a gente reconhece seu rosto nas fotos. Seu rosto só é usado {BRAND.faceScope} e é apagado depois da festa.</p>
+            <div className="consent-choice">
+              <button type="button" className={`chip${faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(true)}>Topo!</button>
+              <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>
+            </div>
+            {faceOptIn && (
+              <button type="button" className="selfie" onClick={() => setCam(true)}>
+                {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty"><SelfieIcon /></span>}
+                <span>{selfieUrl ? 'Trocar selfie' : 'Tirar minha selfie'}</span>
+              </button>
+            )}
           </div>
-          {faceOptIn && (
-            <button type="button" className="selfie" onClick={() => setCam(true)}>
-              {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty"><SelfieIcon /></span>}
-              <span>{selfieUrl ? 'Trocar selfie' : 'Tirar minha selfie'}</span>
-            </button>
-          )}
-        </div>
+        )}
 
         {sameName ? (
           <div className="same-name" role="alert">

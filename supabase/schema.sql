@@ -44,7 +44,10 @@ create table public.event_config (
   gen_min_guests integer default 15 not null,
   gen_max_people integer default 4 not null,
   gen_swaps integer default 3 not null,
-  invite_only boolean default false not null
+  invite_only boolean default false not null,
+  faces_on boolean default true not null,
+  missions_on boolean default true not null,
+  ranking_on boolean default true not null
 );
 
 create table public.event_secret (
@@ -648,6 +651,9 @@ begin
     lng = case when p ? 'lng' then (p->>'lng')::double precision else lng end,
     test_mode = coalesce((p->>'test_mode')::boolean, test_mode),
     invite_only = coalesce((p->>'invite_only')::boolean, invite_only),
+    faces_on = coalesce((p->>'faces_on')::boolean, faces_on),
+    missions_on = coalesce((p->>'missions_on')::boolean, missions_on),
+    ranking_on = coalesce((p->>'ranking_on')::boolean, ranking_on),
     gen_missions = coalesce((p->>'gen_missions')::boolean, gen_missions),
     -- greatest/least skip nulls, so a missing field must keep the old value explicitly
     gen_max_people = case when p ? 'gen_max_people' then least(greatest((p->>'gen_max_people')::int, 1), 6) else gen_max_people end,
@@ -729,7 +735,8 @@ begin
     'app_opens', c.app_opens, 'party_starts', c.party_starts, 'party_ends', c.party_ends,
     'look_opens', c.look_opens, 'look_closes', c.look_closes, 'test_mode', c.test_mode,
     'place', c.place, 'address', c.address, 'maps_url', c.maps_url, 'lat', c.lat, 'lng', c.lng,
-    'invite_only', c.invite_only, 'now', now()
+    'invite_only', c.invite_only, 'faces_on', c.faces_on, 'missions_on', c.missions_on,
+    'ranking_on', c.ranking_on, 'now', now()
   );
 end $function$
 ;
@@ -744,6 +751,10 @@ declare s jsonb; p jsonb := '[]'::jsonb;
 begin
   insert into public.rostos_vivo (id, seen_at) values (1, now())
   on conflict (id) do update set seen_at = excluded.seen_at;
+  -- recognition paused by the organizer: the reader finds nothing to do and stops on its own
+  if not coalesce((select faces_on from public.event_config), true) then
+    return jsonb_build_object('selfies', '[]'::jsonb, 'photos', '[]'::jsonb);
+  end if;
   with c as (
     select id from public.guests
     where face_status = 'pending' and selfie_path is not null and (face_claimed_at is null or face_claimed_at < now() - interval '5 minutes')
@@ -991,9 +1002,10 @@ CREATE OR REPLACE FUNCTION public.face_work_waiting()
  STABLE SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-  select exists (select 1 from public.guests where face_status = 'pending' and selfie_path is not null)
+  select coalesce((select faces_on from public.event_config), true) and (
+    exists (select 1 from public.guests where face_status = 'pending' and selfie_path is not null)
       or (exists (select 1 from public.photos where faces_status = 'pending' and kind = 'party' and removed_at is null)
-          and exists (select 1 from public.face_refs where embedding is not null))
+          and exists (select 1 from public.face_refs where embedding is not null)))
 $function$
 ;
 

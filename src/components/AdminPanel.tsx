@@ -163,6 +163,34 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
         <button className="btn primary small" onClick={onTelao}>Abrir telão</button>
       </section>
 
+      {ev && (
+        <section className="panel admin-section">
+          <h3>Liga e desliga</h3>
+          <p className="page-note">Vale na hora pra todo mundo, sem atualizar o app. Use se algo der problema no dia.</p>
+          {(
+            [
+              ['faces_on', 'Reconhecimento de rostos', 'Rostos ligados: quem entra tira selfie e as fotos acham quem aparece.', 'Rostos pausados: ninguém mais tira selfie e as fotos novas esperam. O que já foi achado continua.'],
+              ['missions_on', 'Aba Missões', 'A aba Missões voltou.', 'A aba Missões sumiu dos celulares.'],
+              ['ranking_on', 'Aba Ranking', 'A aba Ranking voltou.', 'A aba Ranking sumiu dos celulares.'],
+            ] as const
+          ).map(([key, label, onMsg, offMsg]) => (
+            <label key={key} className="admin-mini">
+              <input
+                type="checkbox"
+                checked={ev[key]}
+                disabled={busy}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  set(key, on)
+                  run(() => admin.saveEvent({ [key]: on }), on ? onMsg : offMsg)
+                }}
+              />{' '}
+              {label}
+            </label>
+          ))}
+        </section>
+      )}
+
       <section className="panel admin-section">
         <h3>Convite</h3>
         {ev && (
