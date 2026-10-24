@@ -202,7 +202,12 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry, name = '
       </div>
 
       <div className="feed-meta">
-        {top.status === 'failed' ? (
+        {top.status === 'failed' && top.kept ? (
+          // no signal at the party is normal: the photo is safe on the phone and goes when the internet is back
+          <button className="feed-status waiting" onClick={() => onRetry?.(top.id)}>
+            Guardada no celular. Sobe sozinha quando a internet voltar.
+          </button>
+        ) : top.status === 'failed' ? (
           <button className="feed-status failed" onClick={() => onRetry?.(top.id)}>
             {top.problem ? `Não foi: ${top.problem} A foto segue guardada aqui. Toca pra tentar de novo.` : 'Não foi. Tocar pra reenviar'}
           </button>

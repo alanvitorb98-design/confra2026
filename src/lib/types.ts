@@ -51,6 +51,8 @@ export interface Photo {
   status?: 'sending' | 'failed'
   /** Why a photo from this phone can't be sent, when trying again won't help */
   problem?: string
+  /** A photo from this phone that did not go yet but is kept on it (survives closing the app) and goes on its own */
+  kept?: boolean
   /** CSS background used by the example photos until the backend exists */
   placeholder?: string
   takenAt: Date
