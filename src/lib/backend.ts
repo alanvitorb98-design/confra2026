@@ -195,7 +195,7 @@ export async function join(code: string, g: Omit<Guest, 'id'>, sameName = false)
 async function signedBack(data: Record<string, unknown>): Promise<Guest> {
   const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token as string, refresh_token: data.refresh_token as string })
   if (sessionError) throw new JoinError('other')
-  return { id: data.guest_id as string, name: data.name as string, instagram: (data.instagram as string | null) ?? undefined, faceOptIn: !!data.face }
+  return { id: data.guest_id as string, name: String(data.name ?? ''), instagram: (data.instagram as string | null) ?? undefined, faceOptIn: !!data.face }
 }
 
 /** Back into an existing account on this phone with its código de volta, instead of joining again. */
