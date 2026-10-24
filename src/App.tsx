@@ -24,6 +24,7 @@ import { useBack } from './lib/back'
 import { useSessionState } from './lib/session'
 import { holdUpdate } from './lib/update'
 import { termsAccepted } from './lib/terms'
+import { dropDraft, findDraft, keepDraft } from './lib/draft'
 import { Splash } from './components/Splash'
 import { Logo } from './components/Logo'
 import { PartyScene } from './brand/PartyScene'
@@ -176,6 +177,22 @@ export default function App() {
     }
   }, [guest])
 
+  // a photo left on the developing screen (the app closed, reloaded, or the phone dropped it in the background)
+  // comes back to the same screen
+  const guestId = guest?.id
+  useEffect(() => {
+    if (!guestId) return
+    let live = true
+    findDraft(guestId).then((d) => {
+      if (!live || !d) return
+      setShot((now) => now ?? d.file)
+      setMissionShot((now) => now ?? d.mission)
+    })
+    return () => {
+      live = false
+    }
+  }, [guestId])
+
   if (gate)
     return (
       <Install
@@ -250,10 +267,23 @@ export default function App() {
     ;(fromGallery ? gallery : camera).current?.click()
   }
 
+  const took = (f: File) => {
+    playShutter()
+    setShot(f)
+    keepDraft(guest.id, f, missionShot)
+  }
+
+  const discard = () => {
+    dropDraft()
+    setShot(null)
+    setMissionShot(undefined)
+  }
+
   const post = (caption: string, frame: Frame, preview: string) => {
     if (!shot) return
     // the untouched original File goes up as is: no resizing or recompression anywhere
-    party.post(shot, preview, shootKind, caption, frame, missionShot)
+    // the developing screen's copy goes once the list of photos to send has its own
+    party.post(shot, preview, shootKind, caption, frame, missionShot)?.then(() => dropDraft(shot))
     setMissionShot(undefined)
     setWall(shootKind)
     setShot(null)
@@ -373,9 +403,7 @@ export default function App() {
         onChange={(e) => {
           const f = e.target.files?.[0]
           e.target.value = ''
-          if (!f) return
-          playShutter()
-          setShot(f)
+          if (f) took(f)
         }}
       />
       <input
@@ -386,13 +414,11 @@ export default function App() {
         onChange={(e) => {
           const f = e.target.files?.[0]
           e.target.value = ''
-          if (!f) return
-          playShutter()
-          setShot(f)
+          if (f) took(f)
         }}
       />
 
-      {shot && <Develop key={shot.name + shot.lastModified} file={shot} postLabel={shootKind === 'look' ? 'Postar meu look' : 'Postar no feed'} onPost={post} onDiscard={() => setShot(null)} />}
+      {shot && <Develop key={shot.name + shot.lastModified} file={shot} postLabel={shootKind === 'look' ? 'Postar meu look' : 'Postar no feed'} onPost={post} onDiscard={discard} />}
       {open && (
         <Viewer
           // the live copy: its links and who appears keep updating while it is open
