@@ -1,6 +1,6 @@
 import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { applyConfig, type EventConfig } from './event'
+import { applyConfig, now, serverSaid, type EventConfig } from './event'
 import { stripGps } from './exif'
 import * as outbox from './outbox'
 import { everyRow, photoId } from './ids'
@@ -294,8 +294,10 @@ export async function myFaceStatus(guestId: string) {
 
 /** Party times (always) and place (with the invitation code or a login), from the organizer's settings. */
 export async function loadEvent(code?: string) {
+  const sentAt = Date.now()
   const { data, error } = await db.rpc('event_public', { p_code: code || null })
   if (error || !data) return false
+  serverSaid((data as EventConfig).now, sentAt, Date.now())
   applyConfig(data as EventConfig)
   return true
 }
@@ -1125,7 +1127,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
   const post = (file: File, preview: string, kind: Wall, caption: string, frame: Frame, missionId?: string) => {
     if (!me) return
     // the id carries the moment it was taken, so a late send (no signal at the party) is still accepted
-    const id = photoId()
+    const id = photoId(now())
     const ext = (file.name.match(/\.([a-z0-9]{2,5})$/i)?.[1] ?? file.type.split('/')[1] ?? 'jpg').toLowerCase()
     const base = `${kind}/${me.id}/${id}`
     const row: PhotoRow = {
