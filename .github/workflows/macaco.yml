@@ -1,0 +1,49 @@
+name: Macaco
+
+# The monkey test (e2e/macaco.monkey.ts): random taps, swipes, typing, back and reload for a few minutes, failing
+# on any page error or a blank screen. Every Monday and on demand (Actions › Macaco › Run workflow), not on every
+# PR. A failure prints the seed and the last actions; run it again with that seed to see the same thing.
+on:
+  schedule:
+    - cron: '0 10 * * 1'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Quantos minutos'
+        default: '2'
+      seed:
+        description: 'Semente (vazio = nova)'
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  macaco:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run the monkey
+        run: |
+          m=${MINUTES//[^0-9]/}
+          export MACACO_MS=$(( ${m:-2} * 60000 ))
+          s=${SEED//[^0-9]/}
+          if [ -n "$s" ]; then export MACACO_SEED="$s"; fi
+          npm run macaco
+        env:
+          CI: '1'
+          MINUTES: ${{ inputs.minutes }}
+          SEED: ${{ inputs.seed }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: macaco-report
+          path: playwright-report
+          retention-days: 7

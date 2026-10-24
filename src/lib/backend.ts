@@ -560,7 +560,8 @@ export function useParty(me: Guest | null, peopleOn = false) {
       const now = Date.now()
       const due = paths.filter((p) => now - (signedAt.current.get(p) ?? 0) > LINK_REUSE_MS)
       if (!due.length) return
-      const { data } = await db.storage.from(BUCKET).createSignedUrls(due, LINK_TTL)
+      // a broken answer (a captive wifi page instead of the server) is just no links this time
+      const { data } = await db.storage.from(BUCKET).createSignedUrls(due, LINK_TTL).catch(() => ({ data: null }))
       if (!alive || !data) return
       setLinks((m) => {
         const next = new Map(m)

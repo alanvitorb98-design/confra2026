@@ -49,6 +49,11 @@ export async function fakeBackend(page: Page, rpc: Record<string, unknown> = {})
       return route.fulfill({ json: { access_token: TOKEN, refresh_token: 'teste', guest_id: GUEST_ID, ...out?.json } })
     }
     if (url.pathname === '/auth/v1/user') return route.fulfill({ json: USER })
+    // links to the photos: one per path asked, pointing nowhere
+    if (url.pathname.startsWith('/storage/v1/object/sign/')) {
+      const paths = ((route.request().postDataJSON?.() ?? {}) as { paths?: string[] }).paths ?? []
+      return route.fulfill({ json: paths.map((path) => ({ path, signedURL: `/object/sign/fotos/${path}?token=teste`, error: null })) })
+    }
     if (url.pathname.startsWith('/storage/v1/object/')) {
       calls.push({ fn: 'upload', body: url.pathname })
       return route.fulfill({ json: { Key: url.pathname } })
