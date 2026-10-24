@@ -64,11 +64,38 @@ reset role;
 do $$
 declare t text; p jsonb;
 begin
-  select token into t from public.invites where label = 'Tia Lu';
+  select token into t from public.invites where label = 'Primos';
   update public.guests set invite_id = (select id from public.invites where token = t) where name in ('Ana', 'Bia');
   p := public.invite_peek(lower(substr(t, 1, 5)) || '-' || substr(t, 6));
-  assert p->>'label' = 'Tia Lu' and not (p->>'revoked')::boolean, 'convite não achado pelo link digitado';
+  assert p->>'label' = 'Primos' and not (p->>'revoked')::boolean, 'convite não achado pelo link digitado';
   assert jsonb_array_length(p->'people') = 2, 'não listou quem entrou';
   assert public.invite_peek('NAOEXISTE1') is null, 'token inventado achou convite';
+end $$;
+
+-- the seats are counted by the database itself, so two phones on the same link at once cannot both take the last
+-- one (supabase/tests/corrida.sh runs them really at the same time)
+do $$
+declare tia uuid := (select id from public.invites where label = 'Tia Lu');
+begin
+  insert into public.guests (name, invite_id) values ('Tia Lu', tia);
+  begin
+    insert into public.guests (name, invite_id) values ('Penetra', tia);
+    raise exception 'entrou mais gente que os lugares';
+  exception when others then
+    if sqlerrm <> 'cheio' then raise; end if;
+  end;
+  begin
+    update public.guests set invite_id = tia where name = 'Org';
+    raise exception 'mudar de convite passou dos lugares';
+  exception when others then
+    if sqlerrm <> 'cheio' then raise; end if;
+  end;
+  update public.guests set name = 'Tia Lúcia' where invite_id = tia;
+  begin
+    insert into public.guests (name, invite_id) values ('Atrasado', (select id from public.invites where label = 'Família Souza'));
+    raise exception 'convite cancelado deixou entrar';
+  exception when others then
+    if sqlerrm <> 'convite' then raise; end if;
+  end;
 end $$;
 rollback;

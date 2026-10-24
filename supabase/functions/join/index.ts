@@ -170,18 +170,20 @@ Deno.serve(async (req) => {
 
   // with "só com convite" on, a new guest needs an invitation with a free seat or the event code
   const inv = inviteToken ? await findInvite(inviteToken) : null
-  const inviteId = inv && !inv.revoked && inv.people.length < inv.seats ? inv.id : null
-  if (!inviteId) {
+  let inviteId = inv && !inv.revoked && inv.people.length < inv.seats ? inv.id : null
+  // without a seat on an invitation: allowed unless "só com convite" is on and the event code is wrong
+  const openDoor = async () => {
     const [{ data: cfg }, { data: sec }] = await Promise.all([
       admin.from('event_config').select('invite_only').maybeSingle(),
       admin.from('event_secret').select('code').maybeSingle(),
     ])
-    const codeOk = !!cleanCode(body.code) && cleanCode(body.code) === cleanCode(sec?.code)
-    if (cfg?.invite_only && !codeOk) {
-      if (keyMine) await admin.from('join_keys').delete().eq('key', key)
-      return reply(inv && !inv.revoked ? 409 : 403, { error: inv && !inv.revoked ? 'cheio' : 'convite' })
-    }
+    return !cfg?.invite_only || (!!cleanCode(body.code) && cleanCode(body.code) === cleanCode(sec?.code))
   }
+  const turnAway = async (full: boolean) => {
+    if (keyMine) await admin.from('join_keys').delete().eq('key', key)
+    return reply(full ? 409 : 403, { error: full ? 'cheio' : 'convite' })
+  }
+  if (!inviteId && !(await openDoor())) return turnAway(!!inv && !inv.revoked)
 
   // someone already in with the same name: most likely this person on another phone or browser. The phone
   // asks "is it you?" and sends again with same_name when it is someone else.
@@ -199,20 +201,34 @@ Deno.serve(async (req) => {
   const { data: created, error: userError } = await admin.auth.admin.createUser({ email, password, email_confirm: true })
   if (userError || !created.user) return reply(500, { error: 'conta' })
 
-  const { data: guest, error: guestError } = await admin
-    .from('guests')
-    .insert({
-      name,
-      instagram: instagram || null,
-      face_opt_in: body.face === true,
-      user_id: created.user.id,
-      invite_id: inviteId,
-      terms_version: terms,
-      terms_at: terms ? new Date().toISOString() : null,
-    })
-    .select('id')
-    .single()
-  if (guestError) return reply(500, { error: 'convidado' })
+  const userId = created.user.id
+  const addGuest = () =>
+    admin
+      .from('guests')
+      .insert({
+        name,
+        instagram: instagram || null,
+        face_opt_in: body.face === true,
+        user_id: userId,
+        invite_id: inviteId,
+        terms_version: terms,
+        terms_at: terms ? new Date().toISOString() : null,
+      })
+      .select('id')
+      .single()
+  let { data: guest, error: guestError } = await addGuest()
+  // the database takes the seat (the invitation is locked while its guests are counted): someone else on the same
+  // link got the last one a moment ago, or the organizer cancelled it
+  if (guestError && inviteId && /^(cheio|convite)$/.test(guestError.message)) {
+    const full = guestError.message === 'cheio'
+    inviteId = null
+    if (await openDoor()) ({ data: guest, error: guestError } = await addGuest())
+    else {
+      await admin.auth.admin.deleteUser(userId)
+      return turnAway(full)
+    }
+  }
+  if (guestError || !guest) return reply(500, { error: 'convidado' })
   if (keyMine) await admin.from('join_keys').update({ guest_id: guest.id }).eq('key', key)
 
   const { data: signed, error: signError } = await createClient(URL_, ANON, { auth: { persistSession: false } }).auth.signInWithPassword({ email, password })

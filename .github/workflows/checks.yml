@@ -58,3 +58,5 @@ jobs:
             echo "== $f"
             psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
           done
+      - name: Run the race tests
+        run: bash supabase/tests/corrida.sh
