@@ -45,6 +45,7 @@ describe("the server's clock", () => {
   })
 
   it('an answer without the time changes nothing', async () => {
+    vi.useFakeTimers({ now: new Date('2026-11-07T20:00:00Z'), toFake: ['Date'] })
     const e = await load()
     e.serverSaid(undefined, Date.now(), Date.now())
     expect(e.now()).toBe(Date.now())
