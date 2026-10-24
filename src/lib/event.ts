@@ -36,6 +36,8 @@ export interface EventConfig {
   lat?: number | null
   lng?: number | null
   invite_only?: boolean
+  /** the server's clock when it answered */
+  now?: string
 }
 
 const CONFIG_KEY = storageKey('event')
@@ -111,7 +113,35 @@ export function setTestClock(at: string | null) {
 }
 export const testClock = offset !== 0
 
-export const now = () => Date.now() + offset
+// The phone's own clock can be minutes or hours off (set by hand, a wrong time zone): the server's time, sent with
+// the party times, sets it right for the countdown, the phases and the moment a photo was taken (the server
+// refuses a photo stamped more than five minutes ahead). Kept so the app opens right without signal.
+const SKEW_KEY = storageKey('relogio')
+let skew = 0
+try {
+  const v = Number(localStorage.getItem(SKEW_KEY))
+  if (Number.isFinite(v)) skew = v
+} catch {
+  /* storage blocked */
+}
+
+/** The server said it was `at` for a request sent at `sentAt` and answered at `gotAt` (this phone's clock). */
+export function serverSaid(at: string | undefined, sentAt: number, gotAt: number) {
+  const t = at ? Date.parse(at) : NaN
+  // a slow answer only says the time is somewhere in a long wait
+  if (Number.isNaN(t) || gotAt - sentAt > 10_000) return
+  const s = t - (sentAt + gotAt) / 2
+  // a few seconds off changes nothing on screen
+  skew = Math.abs(s) < 30_000 ? 0 : Math.round(s)
+  try {
+    localStorage.setItem(SKEW_KEY, String(skew))
+  } catch {
+    /* private mode */
+  }
+}
+
+/** Now, on the server's clock (or the organizer's test clock). */
+export const now = () => Date.now() + (offset || skew)
 
 /** Current time, ticking every second while a countdown is on screen, else every 15 seconds. */
 export function useNow(everySecond = false) {

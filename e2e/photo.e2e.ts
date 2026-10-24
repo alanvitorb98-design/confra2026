@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { fakeBackend } from './backend'
+import { event, fakeBackend } from './backend'
 
 // the photo's whole way: sign up during the party, take it, reveal it, post it
 const DURING = new Date('2026-11-07T11:00:00-03:00')
@@ -60,6 +60,20 @@ test('a photo taken during the party is uploaded and published once', async ({ p
   expect(uploads.some((u) => u.endsWith(sent.p_original))).toBe(true)
   expect(uploads.some((u) => u.endsWith(sent.p_preview))).toBe(true)
   expect(uploads.some((u) => u.endsWith(sent.p_preview.replace(/-p\.jpg$/, '-t.jpg')))).toBe(true)
+})
+
+test("a phone whose clock is two hours ahead follows the server's time", async ({ page }) => {
+  const serverNow = new Date('2026-11-07T19:00:00-03:00')
+  const calls = await fakeBackend(page, { event_public: { ...event, now: serverNow.toISOString() } })
+  // on its own clock the party ended an hour ago
+  await page.clock.install({ time: new Date('2026-11-07T21:00:00-03:00') })
+  await signUp(page)
+  await takeAndPost(page)
+  await expect.poll(() => calls.filter((c) => c.fn === 'send_photo').length, { timeout: 15_000 }).toBe(1)
+  // the photo carries the moment it was taken on the server's clock (the server refuses one from the future)
+  const id = (calls.find((c) => c.fn === 'send_photo')!.body as { p_id: string }).p_id
+  const taken = parseInt(id.replace(/-/g, '').slice(0, 12), 16)
+  expect(Math.abs(taken - serverNow.getTime())).toBeLessThan(5 * 60_000)
 })
 
 test('a photo that fails to publish stays on the phone and goes out after the app reopens', async ({ page }) => {

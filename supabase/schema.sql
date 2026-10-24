@@ -729,7 +729,7 @@ begin
     'app_opens', c.app_opens, 'party_starts', c.party_starts, 'party_ends', c.party_ends,
     'look_opens', c.look_opens, 'look_closes', c.look_closes, 'test_mode', c.test_mode,
     'place', c.place, 'address', c.address, 'maps_url', c.maps_url, 'lat', c.lat, 'lng', c.lng,
-    'invite_only', c.invite_only
+    'invite_only', c.invite_only, 'now', now()
   );
 end $function$
 ;
