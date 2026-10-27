@@ -121,10 +121,20 @@ def signatures(img, largest_only=False):
 
 def call(op, body=None):
     headers = {"x-face-secret": SECRET}
-    if body is None:
-        r = requests.get(FACES_URL, params={"op": op}, headers=headers, timeout=60)
-    else:
-        r = requests.post(FACES_URL, params={"op": op}, json=body, headers=headers, timeout=60)
+    # a 503 while the server starts more copies (many photos at once) or a lost answer is tried again:
+    # without this, a photo whose result could not be saved was marked failed. Saving twice is harmless.
+    for tries in range(1, 4):
+        try:
+            if body is None:
+                r = requests.get(FACES_URL, params={"op": op}, headers=headers, timeout=60)
+            else:
+                r = requests.post(FACES_URL, params={"op": op}, json=body, headers=headers, timeout=60)
+            if r.status_code < 500 or tries == 3:
+                break
+        except (requests.ConnectionError, requests.Timeout):
+            if tries == 3:
+                raise
+        time.sleep(2 * tries)
     r.raise_for_status()
     return r.json()
 
