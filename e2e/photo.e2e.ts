@@ -153,12 +153,30 @@ test('tapping "Entrar" again after a lost answer signs into the same guest', asy
   await page.getByLabel('Nome e sobrenome').fill('Ana Teste')
   await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
   await page.getByRole('button', { name: 'Entrar na festa' }).click()
-  await expect.poll(() => calls.filter((c) => c.fn === 'join').length).toBe(1)
+  // the app tries 3 times on its own before giving up
+  await expect.poll(() => calls.filter((c) => c.fn === 'join').length, { timeout: 15_000 }).toBe(3)
   fail = false
   await page.getByRole('button', { name: 'Entrar na festa' }).click()
   await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
   const keys = calls.filter((c) => c.fn === 'join').map((c) => (c.body as { key?: string }).key)
-  expect(keys).toHaveLength(2)
+  expect(keys).toHaveLength(4)
   expect(keys[0]).toMatch(/^[0-9a-f-]{36}$/)
-  expect(keys[1]).toBe(keys[0])
+  expect(new Set(keys).size).toBe(1)
+})
+
+test('when the server is still starting up (503), the app tries again by itself', async ({ page }) => {
+  let tries = 0
+  const calls = await fakeBackend(page, { join: () => (++tries === 1 ? { status: 503, json: { code: 'BOOT_ERROR' } } : null) })
+  await page.clock.install({ time: DURING })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Continuar no navegador' }).click()
+  await page.locator('.splash-go').click()
+  const terms = page.getByRole('dialog', { name: 'Combinados da festa' })
+  await terms.getByLabel('Li e topo os combinados').check()
+  await terms.getByRole('button', { name: 'Entrar' }).click()
+  await page.getByLabel('Nome e sobrenome').fill('Ana Teste')
+  await page.getByRole('button', { name: 'Prefiro marcar na mão' }).click()
+  await page.getByRole('button', { name: 'Entrar na festa' }).click()
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible({ timeout: 15_000 })
+  expect(calls.filter((c) => c.fn === 'join')).toHaveLength(2)
 })

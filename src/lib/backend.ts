@@ -158,6 +158,19 @@ async function joinFailure(error: unknown): Promise<JoinError> {
   return new JoinError('other')
 }
 
+/** The join function, tried again when the server is starting up and sends back a 503 (or the answer gets
+ * lost): many people scanning the QR code at the same moment can find it not ready. Every call is safe to
+ * repeat, a sign-up carries its key. */
+async function callJoin(body: Record<string, unknown>) {
+  for (let tries = 1; ; tries++) {
+    const answer = await db.functions.invoke('join', { body })
+    const status = (answer.error as { context?: Response } | null)?.context?.status
+    const busy = answer.error && (status === undefined || status >= 500)
+    if (!busy || tries === 3) return answer
+    await new Promise((done) => setTimeout(done, 1500 * tries))
+  }
+}
+
 /** Checks the event code on the server, which creates the guest's login. */
 // made before the first try and sent with every try of the same sign-up: when an answer is lost on the
 // way and the guest taps "Entrar" again, the server signs into the guest it already made
@@ -175,9 +188,7 @@ function joinKey() {
 }
 
 export async function join(code: string, g: Omit<Guest, 'id'>, sameName = false): Promise<Guest> {
-  const { data, error } = await db.functions.invoke('join', {
-    body: { code, invite: inviteToken(), name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted(), key: joinKey(), same_name: sameName },
-  })
+  const { data, error } = await callJoin({ code, invite: inviteToken(), name: g.name, instagram: g.instagram ?? '', face: g.faceOptIn, terms: termsAccepted(), key: joinKey(), same_name: sameName })
   if (error) throw await joinFailure(error)
   const { error: sessionError } = await db.auth.setSession({ access_token: data.access_token, refresh_token: data.refresh_token })
   if (sessionError) throw new JoinError('other')
@@ -200,7 +211,7 @@ async function signedBack(data: Record<string, unknown>): Promise<Guest> {
 
 /** Back into an existing account on this phone with its código de volta, instead of joining again. */
 export async function comeBack(code: string): Promise<Guest> {
-  const { data, error } = await db.functions.invoke('join', { body: { back: code } })
+  const { data, error } = await callJoin({ back: code })
   if (error) throw await joinFailure(error)
   return signedBack(data)
 }
@@ -209,7 +220,7 @@ export type InviteInfo = { label: string; seats: number; people: { id: string; n
 
 /** Who already came in with this invitation; null when the link is wrong or was cancelled. */
 export async function peekInvite(token: string): Promise<InviteInfo | null> {
-  const { data, error } = await db.functions.invoke('join', { body: { invite: token, peek: true } })
+  const { data, error } = await callJoin({ invite: token, peek: true })
   if (!error) return data as InviteInfo
   const why = await joinFailure(error)
   if (why.reason === 'back') return null
@@ -218,14 +229,14 @@ export async function peekInvite(token: string): Promise<InviteInfo | null> {
 
 /** Back into the account of the name picked on the invitation. */
 export async function joinAs(token: string, guestId: string): Promise<Guest> {
-  const { data, error } = await db.functions.invoke('join', { body: { invite: token, as: guestId } })
+  const { data, error } = await callJoin({ invite: token, as: guestId })
   if (error) throw await joinFailure(error)
   return signedBack(data)
 }
 
 /** Whether the event code opens the door (checked before the guest fills in the form). */
 export async function checkCode(code: string): Promise<boolean> {
-  const { error } = await db.functions.invoke('join', { body: { check: code } })
+  const { error } = await callJoin({ check: code })
   if (!error) return true
   const why = await joinFailure(error)
   if (why.reason === 'code') return false
