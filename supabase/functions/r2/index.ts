@@ -120,7 +120,12 @@ Deno.serve(async (req) => {
       if (!paths.length) break
       const { error } = await db.storage.from('fotos').remove(paths)
       if (error) return json({ error: error.message, removed }, 500)
-      await db.from('apagar_arquivos').delete().in('path', paths)
+      // in pieces: 500 paths in one address are about 40 KB, which the server refuses (400), and the same
+      // rows came back every time, so a big clean-up never got past its first 500 files
+      for (let i = 0; i < paths.length; i += 100) {
+        const { error: queueError } = await db.from('apagar_arquivos').delete().in('path', paths.slice(i, i + 100))
+        if (queueError) return json({ error: queueError.message, removed }, 500)
+      }
       removed += paths.length
       if (paths.length < 500) break
     }
