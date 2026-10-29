@@ -17,6 +17,10 @@ const MAX_GUESTS = 1500
 // 190 million codes
 const MAX_BACK_TRIES_PER_HOUR = 200
 const MAX_BACK_TRIES_TOTAL = 2000
+// invitations and the event code have 10 letters (about 60 trillion possibilities): guessing one is hopeless,
+// so only wrong ones are written down, and per network only. There is no limit for everyone together: with
+// one, anybody could send wrong invitations until every guest's good invitation was refused for an hour.
+const MAX_INVITE_TRIES_PER_HOUR = 200
 
 type Invite = { id: string; label: string; seats: number; revoked: boolean; people: { id: string; name: string }[] }
 const cleanCode = (v: unknown) => (typeof v === 'string' ? v.toUpperCase().replace(/[^A-Z0-9]/g, '') : '')
@@ -58,20 +62,24 @@ Deno.serve(async (req) => {
     return signError ? null : signed.session
   }
 
-  // guessing a código de volta, an invitation or the event code: each try is written down before counting
-  // (tries sent all at once each count the others), per network and by everyone together
-  const guessTag = `volta:${ip}`
-  const pastTheLimit = async () => {
-    const [{ count: tries }, { count: all }] = await Promise.all([
-      admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', guessTag).gte('at', since),
+  // guessing a código de volta (6 letters): each try is written down before counting (tries sent all at once
+  // each count the others), per network and by everyone together. A network already past its limit is not
+  // written down any more, so it cannot push the total up on its own.
+  const backTag = `volta:${ip}`
+  const triesOf = async (tag: string) => (await admin.from('join_attempts').select('*', { count: 'exact', head: true }).eq('ip', tag).gte('at', since)).count ?? 0
+  const tooManyBackGuesses = async () => {
+    if ((await triesOf(backTag)) > MAX_BACK_TRIES_PER_HOUR) return true
+    await admin.from('join_attempts').insert({ ip: backTag })
+    const [mine, { count: all }] = await Promise.all([
+      triesOf(backTag),
       admin.from('join_attempts').select('*', { count: 'exact', head: true }).like('ip', 'volta:%').gte('at', since),
     ])
-    return (tries ?? 0) > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL
+    return mine > MAX_BACK_TRIES_PER_HOUR || (all ?? 0) > MAX_BACK_TRIES_TOTAL
   }
-  const tooManyGuesses = async () => {
-    await admin.from('join_attempts').insert({ ip: guessTag })
-    return pastTheLimit()
-  }
+  // a wrong invitation or event code, from this network
+  const inviteTag = `convite:${ip}`
+  const pastInviteLimit = async () => (await triesOf(inviteTag)) > MAX_INVITE_TRIES_PER_HOUR
+  const wrongInvite = () => admin.from('join_attempts').insert({ ip: inviteTag })
   const findInvite = async (token: string) => {
     if (token.length !== 10) return null
     const { data } = await admin.rpc('invite_peek', { p_token: token })
@@ -82,24 +90,32 @@ Deno.serve(async (req) => {
 
   // an invitation opened: who already came in with it, so the guest can pick their own name
   if (body.peek === true) {
-    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    if (await pastInviteLimit()) return reply(429, { error: 'muitas tentativas' })
     const inv = await findInvite(inviteToken)
-    if (!inv || inv.revoked) return reply(404, { error: 'convite' })
+    if (!inv || inv.revoked) {
+      await wrongInvite()
+      return reply(404, { error: 'convite' })
+    }
     return reply(200, { label: inv.label, seats: inv.seats, people: inv.people })
   }
 
   // the event code typed or scanned, checked before the guest fills in the form
   if (typeof body.check === 'string') {
-    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    if (await pastInviteLimit()) return reply(429, { error: 'muitas tentativas' })
     const { data: sec } = await admin.from('event_secret').select('code').maybeSingle()
-    return cleanCode(body.check) && cleanCode(body.check) === cleanCode(sec?.code) ? reply(200, { ok: true }) : reply(403, { error: 'código' })
+    if (cleanCode(body.check) && cleanCode(body.check) === cleanCode(sec?.code)) return reply(200, { ok: true })
+    await wrongInvite()
+    return reply(403, { error: 'código' })
   }
 
   // back into the account of a name picked on the invitation
   if (typeof body.as === 'string') {
-    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    if (await pastInviteLimit()) return reply(429, { error: 'muitas tentativas' })
     const inv = await findInvite(inviteToken)
-    if (!inv || inv.revoked || !inv.people.some((p) => p.id === body.as)) return reply(404, { error: 'convite' })
+    if (!inv || inv.revoked || !inv.people.some((p) => p.id === body.as)) {
+      await wrongInvite()
+      return reply(404, { error: 'convite' })
+    }
     const { data: g } = await admin.from('guests').select('id, name, instagram, face_opt_in, user_id').eq('id', body.as).maybeSingle()
     const session = g?.user_id ? await signInAs(g.user_id) : null
     if (!session) return reply(500, { error: 'sessao' })
@@ -115,7 +131,7 @@ Deno.serve(async (req) => {
 
   // back into an existing account with its código de volta (another phone, browser, or cleared data)
   if (typeof body.back === 'string') {
-    if (await tooManyGuesses()) return reply(429, { error: 'muitas tentativas' })
+    if (await tooManyBackGuesses()) return reply(429, { error: 'muitas tentativas' })
     const code = body.back.toUpperCase().replace(/[^A-Z0-9]/g, '')
     const { data: hit } = code.length === 6 ? await admin.from('guest_codes').select('guest_id').eq('code', code).maybeSingle() : { data: null }
     const { data: g } = hit
@@ -176,14 +192,14 @@ Deno.serve(async (req) => {
   let inviteId = inv && !inv.revoked && inv.people.length < inv.seats ? inv.id : null
   const eventCode = async () => cleanCode((await admin.from('event_secret').select('code').maybeSingle()).data?.code)
   // an invitation or event code sent along with the sign-up is a guess like the ones above: a wrong one is
-  // written down, and past the limit even a right one waits. Only wrong ones count, so a whole party on the
-  // venue's Wi-Fi coming in with good invitations never gets near the limit.
+  // written down, and once this network is past the limit even a right one waits
   if (inviteToken || cleanCode(body.code)) {
-    const right = (!!inv && !inv.revoked) || (!!cleanCode(body.code) && cleanCode(body.code) === (await eventCode()))
-    if (right ? await pastTheLimit() : await tooManyGuesses()) {
+    if (await pastInviteLimit()) {
       if (keyMine) await admin.from('join_keys').delete().eq('key', key)
       return reply(429, { error: 'muitas tentativas' })
     }
+    const right = (!!inv && !inv.revoked) || (!!cleanCode(body.code) && cleanCode(body.code) === (await eventCode()))
+    if (!right) await wrongInvite()
   }
   // without a seat on an invitation: allowed unless "só com convite" is on and the event code is wrong
   const openDoor = async () => {
