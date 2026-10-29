@@ -1647,11 +1647,11 @@ begin
   festa := now() between c.party_starts - interval '30 minutes' and c.party_ends + interval '2 hours';
 
   mb := pg_database_size(current_database()) / 1048576.0;
-  pct := mb / 500 * 100;
-  out := out || jsonb_build_object('item', 'banco', 'pct', round(pct), 'texto', format('Banco: %s MB de 500 MB (%s%%)', round(mb), round(pct)));
+  pct := mb / 8192 * 100;
+  out := out || jsonb_build_object('item', 'banco', 'pct', round(pct), 'texto', format('Banco: %s MB de 8 GB (%s%%)', round(mb), round(pct)));
   mb := coalesce((select sum((metadata->>'size')::bigint) from storage.objects), 0) / 1048576.0;
-  pct := mb / 1024 * 100;
-  out := out || jsonb_build_object('item', 'arquivos', 'pct', round(pct), 'texto', format('Arquivos no Supabase: %s MB de 1 GB (%s%%)', round(mb), round(pct)));
+  pct := mb / 102400 * 100;
+  out := out || jsonb_build_object('item', 'arquivos', 'pct', round(pct), 'texto', format('Arquivos no Supabase: %s GB de 100 GB (%s%%)', round(mb / 1024, 1), round(pct)));
   mb := coalesce((select sum(bytes) from public.photos where on_r2), 0) / 1048576.0;
   pct := mb / 10240 * 100;
   out := out || jsonb_build_object('item', 'r2', 'pct', round(pct), 'texto', format('Originais (Cloudflare): %s GB de 10 GB (%s%%)', round(mb / 1024, 1), round(pct)));
