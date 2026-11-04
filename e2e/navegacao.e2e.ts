@@ -117,6 +117,7 @@ test('the profile picture is a drawing the guest picks, never the selfie, and it
   await tab(page, 'Eu').click()
   await expect(page.locator('.profile img')).toHaveCount(0)
   await page.getByRole('button', { name: 'Trocar foto de perfil' }).click()
+  await expect(page.getByText('Ele não aparece em mais nenhum lugar do app.')).toBeVisible()
   await page.getByRole('radio', { name: 'raposa' }).click()
   await expect(page.getByRole('radiogroup', { name: 'Foto de perfil' })).toBeHidden()
   if (process.env.SHOT_DIR) {

@@ -100,6 +100,7 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
       ) : (
         <p>{TEXT[status]}</p>
       )}
+      <p className="private-note">Sua selfie fica escondida: ninguém vê, e ela só serve pro reconhecimento.</p>
       <div className="admin-row">
         {status !== 'pending' && (
           <button className={`btn ${status === 'ready' ? 'ghost' : 'primary'} small`} disabled={busy} onClick={() => setCam(true)}>

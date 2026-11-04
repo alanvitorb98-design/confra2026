@@ -373,6 +373,8 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .avatar.empty svg { width: 62%; height: 62%; }
 button.avatar { padding: 0; cursor: pointer; color: inherit; }
 .avatar-card { display: grid; gap: 12px; padding: 16px 18px; }
+.private-note { margin: 0; font-size: 13px; color: var(--muted); }
+.avatar-card .private-note { margin-top: -6px; }
 .avatar-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 10px; }
 .avatar-option { aspect-ratio: 1; display: grid; place-items: center; padding: 0; cursor: pointer; border-radius: 50%; background: var(--paper); border: 2px solid var(--line); }
 .avatar-option svg { width: 62%; height: 62%; }

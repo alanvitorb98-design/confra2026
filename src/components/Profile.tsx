@@ -76,6 +76,7 @@ export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, on
       {picking && (
         <div className="panel avatar-card">
           <b>Escolha sua foto de perfil</b>
+          <p className="private-note">Só você vê o bichinho, aqui no seu perfil. Ele não aparece em mais nenhum lugar do app.</p>
           <AvatarPicker value={guest.avatar} onPick={(id) => { onGuest({ ...guest, avatar: id }); setPicking(false) }} />
         </div>
       )}
