@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { progressOf } from '../faceProgress'
+import { FUN_LINES, funLineAt, progressOf, shuffledFunLines } from '../faceProgress'
 
 const pending = { status: 'pending' as const, reading: false, worker: false, ahead: 0 }
 
@@ -29,5 +29,21 @@ describe('selfie progress bar', () => {
   it('hides the bar when the analysis is over', () => {
     expect(progressOf(false, { ...pending, status: 'ready' }, 0, 0)).toBeNull()
     expect(progressOf(false, { ...pending, status: 'failed' }, 0, 0)).toBeNull()
+  })
+})
+
+describe('playful lines while the selfie is read', () => {
+  it('keeps every line once in a shuffled order', () => {
+    const order = shuffledFunLines(() => 0.3)
+    expect(order).toHaveLength(FUN_LINES.length)
+    expect(new Set(order)).toEqual(new Set(FUN_LINES))
+  })
+
+  it('moves to the next line every few seconds and starts over at the end', () => {
+    const lines = ['a', 'b', 'c']
+    expect(funLineAt(lines, 0, 0)).toBe('a')
+    expect(funLineAt(lines, 0, 2_000)).toBe('a')
+    expect(funLineAt(lines, 0, 3_000)).toBe('b')
+    expect(funLineAt(lines, 0, 9_000)).toBe('a')
   })
 })

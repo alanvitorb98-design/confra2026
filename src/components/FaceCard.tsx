@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { faceOptOut, myFaceProgress, myFaceStatus, sendSelfie, type FaceProgress } from '../lib/backend'
-import { progressOf } from '../lib/faceProgress'
+import { funLineAt, progressOf, shuffledFunLines } from '../lib/faceProgress'
 import type { Guest } from '../lib/types'
 import { SelfieCam } from './SelfieCam'
 
@@ -23,6 +23,8 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
   const [prog, setProg] = useState<FaceProgress>()
   const [since, setSince] = useState(() => Date.now())
   const [now, setNow] = useState(() => Date.now())
+  const [funLines] = useState(shuffledFunLines)
+  const [funSince] = useState(() => Date.now())
 
   useEffect(() => {
     let alive = true
@@ -96,10 +98,12 @@ export function FaceCard({ guest, onChange }: { guest: Guest; onChange: (g: Gues
           <div className="face-progress-track">
             <i style={{ width: `${bar.pct}%` }} />
           </div>
+          <p className="face-fun">{funLineAt(funLines, funSince, now)}</p>
         </div>
       ) : (
         <p>{TEXT[status]}</p>
       )}
+      <p className="private-note">Sua selfie fica escondida: ninguém vê, e ela só serve pro reconhecimento.</p>
       <div className="admin-row">
         {status !== 'pending' && (
           <button className={`btn ${status === 'ready' ? 'ghost' : 'primary'} small`} disabled={busy} onClick={() => setCam(true)}>

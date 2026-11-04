@@ -185,6 +185,7 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, askFac
           <div className="consent">
             <b>Bora brincar de paparazzi?</b>
             <p>Pra valer as missões e o ranking de quem mais aparece, a gente reconhece seu rosto nas fotos. Seu rosto só é usado {BRAND.faceScope} e é apagado depois da festa. É opcional, e dá pra sair quando quiser em Eu.</p>
+            <p className="private-note">Sua selfie fica escondida: ninguém vê, e ela só serve pro reconhecimento.</p>
             <div className="consent-choice">
               <button type="button" className={`chip${faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(true)}>Topo!</button>
               <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>
