@@ -181,6 +181,16 @@ export function CheckIcon() {
   )
 }
 
+/** Profile picture for everyone: the selfie is only for face matching and is never shown. */
+export function UserIcon() {
+  return (
+    <svg viewBox="0 0 48 48" aria-hidden>
+      <circle cx="24" cy="18" r="8" {...line} fill={gold} fillOpacity=".35" />
+      <path d="M10 41c1.8-8 7.2-12 14-12s12.2 4 14 12" {...line} />
+    </svg>
+  )
+}
+
 /** Empty selfie slot: a little Polaroid with a face waiting, and a flash that twinkles now and then. */
 export function SelfieIcon() {
   return (

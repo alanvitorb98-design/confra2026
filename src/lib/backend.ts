@@ -272,7 +272,7 @@ async function lightCopy(file: Blob, width: number, quality?: number) {
 /** Sends the selfie for face matching. The server keeps only its numbers and deletes the photo. */
 export async function sendSelfie(guestId: string, selfie: Blob) {
   const path = `selfie/${guestId}/${crypto.randomUUID()}.jpg`
-  const { error } = await db.storage.from(BUCKET).upload(path, await lightCopy(selfie, 1080), { contentType: 'image/jpeg', upsert: false })
+  const { error } = await db.storage.from(BUCKET).upload(path, await lightCopy(selfie, 720), { contentType: 'image/jpeg', upsert: false })
   if (error) throw error
   const { error: e2 } = await db.rpc('set_selfie', { p_path: path })
   if (e2) throw e2
