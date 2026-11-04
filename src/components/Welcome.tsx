@@ -191,8 +191,8 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, askFac
             </div>
             {faceOptIn && (
               <button type="button" className="selfie" onClick={() => setCam(true)}>
-                {selfieUrl ? <img src={selfieUrl} alt="Sua selfie" /> : <span className="selfie-empty"><SelfieIcon /></span>}
-                <span>{selfieUrl ? 'Trocar selfie' : 'Tirar minha selfie'}</span>
+                <span className="selfie-empty"><SelfieIcon /></span>
+                <span>{selfieUrl ? 'Selfie pronta! Toque pra trocar' : 'Tirar minha selfie'}</span>
               </button>
             )}
           </div>

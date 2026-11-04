@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { myReturnCode } from '../lib/backend'
 import type { Guest } from '../lib/types'
 import { FaceCard } from './FaceCard'
+import { UserIcon } from './Icons'
 import { VersionCard } from './VersionCard'
 import CountUp from './bits/CountUp'
 
@@ -60,7 +61,7 @@ export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, on
   return (
     <div className="page">
       <div className="profile">
-        {guest.selfieUrl ? <img className="avatar" src={guest.selfieUrl} alt="" /> : <span className="avatar empty">{guest.name[0]}</span>}
+        <span className="avatar empty"><UserIcon /></span>
         <div>
           <h2 className="page-title">{guest.name}</h2>
           {guest.instagram && (

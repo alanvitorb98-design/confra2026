@@ -370,6 +370,7 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
   background: linear-gradient(var(--paper), var(--paper)) padding-box, linear-gradient(135deg, var(--gold-hi), var(--gold-deep)) border-box;
   box-shadow: var(--shadow-3); }
 .avatar.empty { display: grid; place-items: center; font-family: var(--display); font-size: 30px; }
+.avatar.empty svg { width: 62%; height: 62%; }
 .insta { color: var(--gold-deep); text-decoration: none; font-weight: 600; }
 .stats { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); padding: 14px 6px; }
 .stats div { text-align: center; }
