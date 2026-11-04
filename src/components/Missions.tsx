@@ -68,7 +68,7 @@ export function Missions({ missions, people, onSwap, onShoot, locked, phase }: P
             <span className="mission-title">{current.title}</span>
             <span className="mission-pts">+{current.points}</span>
             {current.target && <span className="mission-hint">Vale quando o rosto de {current.target} aparecer na foto.</span>}
-            {current.status === 'checking' && <span className="mission-hint" role="status">Conferindo quem está na foto…</span>}
+            {current.status === 'checking' && <span className="mission-hint" role="status">Conferindo quem está na foto… pode levar alguns minutos. Aproveita a festa: os pontos chegam sozinhos.</span>}
             {current.status === 'missed' && <span className="mission-hint miss" role="status">Não encontrei {current.target ?? 'a pessoa'} na última foto. Tenta outra, com o rosto bem visível.</span>}
             <button className="btn primary small" onClick={() => onShoot(current.id)}>{current.status ? 'Tirar outra' : 'Tirar a foto'}</button>
           </li>
@@ -131,7 +131,7 @@ function PeopleMission({ people, onSwap, onShoot }: { people: People; onSwap: Pr
           <span className="mission-hint">
             {c.people && c.people.length > 1 ? `Vale quando os rostos de ${listNames(c.people)} aparecerem juntos na foto.` : `Vale quando o rosto de ${c.people?.[0] ?? 'quem foi sorteado'} aparecer na foto.`}
           </span>
-          {c.status === 'checking' && <span className="mission-hint" role="status">Conferindo quem está na foto…</span>}
+          {c.status === 'checking' && <span className="mission-hint" role="status">Conferindo quem está na foto… pode levar alguns minutos. Aproveita a festa: os pontos chegam sozinhos.</span>}
           {c.status === 'missed' && <span className="mission-hint miss" role="status">Faltou alguém na última foto. Junta todo mundo, com o rosto bem visível.</span>}
           <div className="people-actions">
             <button className="btn primary small" onClick={() => onShoot(c.id)}>{c.status ? 'Tirar outra' : 'Tirar a foto'}</button>
