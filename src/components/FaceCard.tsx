@@ -9,7 +9,7 @@ type Status = 'none' | 'pending' | 'ready' | 'failed'
 const TEXT: Record<Status, string> = {
   none: 'Desligado. Com uma selfie o app acha você nas fotos e conta no ranking de quem mais aparece.',
   pending: 'Analisando sua selfie… pode levar um minutinho.',
-  ready: 'Ligado! O app já procura você nas fotos da festa.',
+  ready: 'Ligado! O app procura você nas fotos da festa. Cada foto leva alguns minutos pra ser lida (mais na hora do pico), então aproveita a festa e volta depois pra ver.',
   failed: 'Não achei um rosto nessa selfie. Tenta outra, de frente e com luz.',
 }
 
