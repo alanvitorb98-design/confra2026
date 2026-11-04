@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import { Avatar, AvatarPicker } from './Avatars'
 import { myReturnCode } from '../lib/backend'
 import type { Guest } from '../lib/types'
 import { FaceCard } from './FaceCard'
-import { UserIcon } from './Icons'
 import { VersionCard } from './VersionCard'
 import CountUp from './bits/CountUp'
 
@@ -58,17 +58,27 @@ function useReturnCode() {
 
 export function Profile({ guest, myPhotos, points, onLeave, onGuest, isAdmin, onPanel, onClaim }: Props) {
   const code = useReturnCode()
+  const [picking, setPicking] = useState(false)
   return (
     <div className="page">
       <div className="profile">
-        <span className="avatar empty"><UserIcon /></span>
+        <button type="button" className="avatar empty" onClick={() => setPicking(!picking)} aria-label="Trocar foto de perfil" aria-expanded={picking}>
+          <Avatar id={guest.avatar} />
+        </button>
         <div>
           <h2 className="page-title">{guest.name}</h2>
+          {!guest.avatar && !picking && <p className="page-note">Toque no círculo pra escolher um bichinho.</p>}
           {guest.instagram && (
             <a className="insta" href={`https://instagram.com/${guest.instagram}`} target="_blank" rel="noreferrer">@{guest.instagram}</a>
           )}
         </div>
       </div>
+      {picking && (
+        <div className="panel avatar-card">
+          <b>Escolha sua foto de perfil</b>
+          <AvatarPicker value={guest.avatar} onPick={(id) => { onGuest({ ...guest, avatar: id }); setPicking(false) }} />
+        </div>
+      )}
       <dl className="stats two">
         <div><dt>Fotos</dt><dd><CountUp to={myPhotos} /></dd></div>
         <div><dt>Pontos</dt><dd><CountUp to={points} /></dd></div>

@@ -18,6 +18,8 @@ export interface Guest {
   /** Object URL of the selfie, when the guest opted in to face matching */
   selfieUrl?: string
   faceOptIn: boolean
+  /** Profile drawing the guest picked (kept on this phone only) */
+  avatar?: string
 }
 
 /** party: photos during the party; look: the outfit wall, open only in the hours before it */
