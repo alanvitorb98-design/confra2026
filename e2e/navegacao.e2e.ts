@@ -109,3 +109,22 @@ for (const link of ['/?i=xx', '/?i=%3Cscript%3E', '/?c=', '/?c=%22%3E%3Cimg%20sr
     await expect(page.locator('#name, #back-code, .welcome').first()).toBeVisible({ timeout: 15_000 })
   })
 }
+
+test('the profile picture is a drawing the guest picks, never the selfie, and it stays after a reload', async ({ page }) => {
+  await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  await tab(page, 'Eu').click()
+  await expect(page.locator('.profile img')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Trocar foto de perfil' }).click()
+  await page.getByRole('radio', { name: 'raposa' }).click()
+  await expect(page.getByRole('radiogroup', { name: 'Foto de perfil' })).toBeHidden()
+  if (process.env.SHOT_DIR) {
+    await page.getByRole('button', { name: 'Trocar foto de perfil' }).click()
+    await page.screenshot({ path: `${process.env.SHOT_DIR}/perfil.png` })
+    await page.getByRole('radio', { name: 'raposa' }).click()
+  }
+  await page.reload()
+  await page.getByRole('button', { name: 'Trocar foto de perfil' }).click()
+  await expect(page.getByRole('radio', { name: 'raposa' })).toHaveAttribute('aria-checked', 'true')
+})
