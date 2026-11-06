@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { admin, PEOPLE_POINTS, r2Setup, r2Status, type AdminEvent, type MissionRow } from '../lib/backend'
 import { testClock, testMoments } from '../lib/event'
 import { PlaceMap } from './PlaceMap'
+import { Reminders } from './Reminders'
 import { InvitesAdmin, ReturnHelp } from './AdminInvites'
 import { BRAND } from '../brand/brand'
 
@@ -161,6 +162,12 @@ export function AdminPanel({ missions, onClose, onTelao }: Props) {
         <h3>Telão</h3>
         <p className="page-note">Abre num notebook ligado no projetor ou na TV. Passa as últimas fotos sozinho e mostra cada foto nova assim que chega, com o QR pra quem quiser entrar. Esc ou dois toques saem.</p>
         <button className="btn primary small" onClick={onTelao}>Abrir telão</button>
+      </section>
+
+      <section className="panel admin-section">
+        <h3>Alertas de saúde</h3>
+        <p className="page-note">Liga em cada celular de organizador. Chega um aviso quando algo piora e outro quando normaliza.</p>
+        <Reminders admin />
       </section>
 
       {ev && (
