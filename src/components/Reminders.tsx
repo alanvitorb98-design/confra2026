@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { eventCode } from '../lib/backend'
 import { disablePush, enablePush, pushState, testPush, type PushState } from '../lib/push'
 
-/** "Me avisa todo dia": one notification a day until the party (sent by the server). */
-export function Reminders() {
+/** "Me avisa todo dia": one notification a day until the party (sent by the server).
+ *  With `admin`, the same subscription also gets the health alerts sent to organizers. */
+export function Reminders({ admin = false }: { admin?: boolean }) {
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
@@ -33,14 +34,20 @@ export function Reminders() {
       {state === 'off' && (
         <>
           <button className="btn primary wide" disabled={busy} onClick={() => run(async () => setState(await enablePush(eventCode())))}>
-            Me avisa todo dia
+            {admin ? 'Ligar alertas' : 'Me avisa todo dia'}
           </button>
-          <p>Um lembrete por dia até a festa, e outro quando o app abrir.</p>
+          <p>
+            {admin
+              ? 'Vale pra espaço, conexões, erros nos celulares e fila do reconhecimento.'
+              : 'Um lembrete por dia até a festa, e outro quando o app abrir.'}
+          </p>
         </>
       )}
       {state === 'on' && (
         <>
-          <p className="cd-remind-on">Avisos ligados. Todo dia às 9h chega a contagem.</p>
+          <p className="cd-remind-on">
+            {admin ? 'Alertas ligados neste celular.' : 'Avisos ligados. Todo dia às 9h chega a contagem.'}
+          </p>
           <div className="cd-actions">
             <button className="btn ghost small" disabled={busy} onClick={() => run(testPush, 'Mandei um aviso de teste.')}>
               Testar agora
