@@ -10,6 +10,14 @@ test('an organizer turns on the health alerts from the panel', async ({ page }) 
   await fakeBackend(page, { is_admin: true })
   // the panel reads the settings straight from the table
   await page.route(/\/rest\/v1\/event_config/, (route) => route.fulfill({ json: { ...event, invite_only: false } }))
+  await page.context().grantPermissions(['notifications'])
+  // the CI browser may lack web push: give it the bare minimum so the panel offers the button
+  await page.addInitScript(() => {
+    const w = window as unknown as Record<string, unknown>
+    if (!('Notification' in w)) w.Notification = { permission: 'default', requestPermission: async () => 'default' }
+    if (!('PushManager' in w)) w.PushManager = function PushManager() {}
+    if (!('serviceWorker' in navigator)) Object.defineProperty(navigator, 'serviceWorker', { value: { getRegistration: async () => undefined } })
+  })
   await page.clock.install({ time: DURING })
   await signUp(page)
   await page.locator('.tabbar').getByRole('button', { name: 'Eu', exact: true }).click()
