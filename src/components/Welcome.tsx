@@ -190,6 +190,7 @@ export function Welcome({ code: linkCode, invite: linkInvite, inviteOnly, askFac
               <button type="button" className={`chip${faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(true)}>Topo!</button>
               <button type="button" className={`chip${!faceOptIn ? ' on' : ''}`} onClick={() => setFaceOptIn(false)}>Prefiro marcar na mão</button>
             </div>
+            {!faceOptIn && <p className="private-note">Sem selfie, o app não acha você nas fotos. Seu nome só aparece se alguém marcar na mão.</p>}
             {faceOptIn && (
               <button type="button" className="selfie" onClick={() => setCam(true)}>
                 <span className="selfie-empty"><SelfieIcon /></span>

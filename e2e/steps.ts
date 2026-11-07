@@ -44,3 +44,11 @@ export async function takeAndPost(page: Page) {
   await page.mouse.up()
   await page.getByRole('button', { name: 'Postar no feed' }).click()
 }
+
+/** A guest without a selfie coming back during the party is told once that they aren't being found in the photos */
+export async function skipFaceAsk(page: Page) {
+  const ask = page.getByRole('dialog', { name: 'Seu rosto não está sendo reconhecido' })
+  await expect(ask).toBeVisible({ timeout: 15_000 })
+  await ask.getByRole('button', { name: 'Continuar sem' }).click()
+  await expect(ask).toBeHidden()
+}

@@ -11,7 +11,8 @@ import { AdminPanel } from './components/AdminPanel'
 import { Telao } from './components/Telao'
 import { TabIcon } from './components/Icons'
 import { Shutter } from './components/Shutter'
-import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, inviteToken, join, joinAs, leave, loadEvent, onSignedOut, returnCodeFromLink, sendSelfie, useParty } from './lib/backend'
+import { FaceAsk } from './components/FaceAsk'
+import { amAdmin, claimAdmin, comeBack, eventCode, hasSession, inviteToken, join, joinAs, leave, loadEvent, myFaceStatus, onSignedOut, returnCodeFromLink, sendSelfie, useParty } from './lib/backend'
 import { playShutter } from './lib/sound'
 import { healPush } from './lib/push'
 import type { Frame, Guest, Photo, Wall } from './lib/types'
@@ -95,6 +96,40 @@ export default function App() {
   const closeTelao = useCallback(() => setTelao(false), [])
   // which mission the photo being taken is for
   const [missionShot, setMissionShot] = useState<string>()
+  // a guest with no selfie is asked once, on coming back to the app during the party (not right after saying no
+  // at sign-up): the organizers can't find who to tell in person
+  const [returning] = useState(() => !!loadGuest())
+  const [faceAsk, setFaceAsk] = useState(false)
+  const askId = guest?.id
+  const optedIn = !!guest?.faceOptIn
+  const facesOn = EVENT.facesOn
+  useEffect(() => {
+    if (!returning || !askId || optedIn || phase !== 'party' || !facesOn) return
+    try {
+      if (localStorage.getItem(storageKey(`face-ask-${askId}`))) return
+    } catch {
+      return
+    }
+    let alive = true
+    myFaceStatus(askId)
+      .then((s) => alive && s === 'none' && setFaceAsk(true))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [returning, askId, optedIn, phase, facesOn])
+  const closeFaceAsk = (yes: boolean) => {
+    try {
+      localStorage.setItem(storageKey(`face-ask-${askId}`), '1')
+    } catch {
+      /* asked again next time */
+    }
+    setFaceAsk(false)
+    if (yes) {
+      setPanel(false)
+      setTab('me')
+    }
+  }
 
   // the back button closes what is on top, and from another tab goes to the feed, before leaving the app
   useBack(!!open, () => setOpen(null))
@@ -106,6 +141,7 @@ export default function App() {
   useBack(telao, () => setTelao(false))
   useBack(start && !guest, () => setStart(false))
   useBack(tab !== 'feed', () => setTab('feed'))
+  useBack(faceAsk, () => closeFaceAsk(false))
 
   // daily reminders: re-register this phone if the push service dropped it
   useEffect(() => {
@@ -451,6 +487,7 @@ export default function App() {
           onClose={() => setOpen(null)}
         />
       )}
+      {faceAsk && !shot && !open && <FaceAsk onYes={() => closeFaceAsk(true)} onNo={() => closeFaceAsk(false)} />}
     </div>
   )
 }
