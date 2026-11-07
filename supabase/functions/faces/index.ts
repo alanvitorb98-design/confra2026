@@ -20,6 +20,14 @@ async function link(path: string) {
   return data?.signedUrl ?? null
 }
 
+// a photo kept on R2 that is read again (someone's selfie came in later) has no analysis copy left in the app's
+// bucket: its 1080px copy on R2 is read instead, through the viewing link the photo already has (renewed daily)
+async function r2Preview(id: string) {
+  const { data } = await db.from('photos').select('preview_url, links_until').eq('id', id).maybeSingle()
+  const until = data?.links_until ? new Date(data.links_until).getTime() : 0
+  return data?.preview_url && until > Date.now() + 15 * 60_000 ? (data.preview_url as string) : null
+}
+
 Deno.serve(async (req) => {
   const secret = req.headers.get('x-face-secret') ?? ''
   const { data: s } = await db.from('event_secret').select('face_hash').single()
@@ -42,7 +50,7 @@ Deno.serve(async (req) => {
       else await db.from('guests').update({ face_status: 'failed' }).eq('id', g.id).eq('face_opt_in', true)
     }
     for (const p of photos) {
-      const url = (await link(analysisPath(p.original_path))) ?? (await link(p.preview_path))
+      const url = (await link(analysisPath(p.original_path))) ?? (await link(p.preview_path)) ?? (await r2Preview(p.id))
       if (url) jobs.push({ kind: 'photo', id: p.id, url })
       else await db.from('photos').update({ faces_status: 'failed' }).eq('id', p.id)
     }
