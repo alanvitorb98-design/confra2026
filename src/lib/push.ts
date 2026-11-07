@@ -22,15 +22,18 @@ async function subscription() {
   return reg ? reg.pushManager.getSubscription() : null
 }
 
+const misKeyed = (sub: PushSubscription) => wrongKey(sub.options?.applicationServerKey, key())
+
 /** This phone's subscription, made again when an old one used another key (it would never get a push). */
 async function mine(reg: ServiceWorkerRegistration) {
   const old = await reg.pushManager.getSubscription()
-  if (old && !wrongKey(old.options.applicationServerKey, key())) return old
-  if (old) {
-    await db.rpc('drop_push', { p_endpoint: old.endpoint, p_auth: old.toJSON().keys?.auth })
-    await old.unsubscribe()
-  }
-  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
+  if (old && !misKeyed(old)) return old
+  // the browser only takes a new key after the old subscription is gone
+  if (old) await old.unsubscribe()
+  const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
+  // the server forgets the old one only once the new one exists; a failure here leaves a dead row, never no row
+  if (old) await db.rpc('drop_push', { p_endpoint: old.endpoint, p_auth: old.toJSON().keys?.auth })
+  return fresh
 }
 
 export async function pushState(): Promise<PushState> {
@@ -69,7 +72,7 @@ export async function healPush() {
     if (!sub) return
     const reg = await navigator.serviceWorker.ready
     let fresh: PushSubscription
-    if (wrongKey(sub.options.applicationServerKey, key())) {
+    if (misKeyed(sub)) {
       // signed up with another key (an older version of the app): no push would ever arrive
       fresh = await mine(reg)
     } else {
