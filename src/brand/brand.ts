@@ -4,6 +4,8 @@
  * in all copies (see docs/nucleo-comum.md). The event's dates and place still come from the organizer panel.
  */
 export const BRAND = {
+  /** Public half of this event's push key (event_secret.vapid_public in this event's database) */
+  vapid: 'BI87pNcLKyENaK6h5SsoqBwoOTWFupvZSBaeQwt9HH7cc_GwVMz9jxom3BklJx5TQaCIKRHNQ0FJtw8U9IwTqkg',
   /** Full name, shown in titles and the install screen */
   name: 'Confra da Firma',
   /** The name inside a sentence ("Coloca ___ na sua tela inicial", "abra ___ pelo ícone") */
