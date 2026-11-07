@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 import { fakeBackend } from './backend'
-import { signUp, takeAndPost } from './steps'
+import { signUp, skipFaceAsk, takeAndPost } from './steps'
 
 // Moving around the app the way guests do: tapping tabs fast, the phone's back button, reloading on any
 // screen, opening odd links. Nothing may break, freeze on a white screen or throw.
@@ -26,6 +26,7 @@ test('jumping between the tabs, going back and reloading keeps the guest where t
   for (const name of ['Missões', 'Ranking', 'Eu']) {
     await tab(page, name).click()
     await page.reload()
+    if (name === 'Missões') await skipFaceAsk(page)
     await expect(tab(page, name)).toHaveAttribute('aria-current', 'true', { timeout: 15_000 })
     // and back goes to the feed, not out of the app
     await page.goBack()
@@ -126,6 +127,27 @@ test('the profile picture is a drawing the guest picks, never the selfie, and it
     await page.getByRole('radio', { name: 'raposa' }).click()
   }
   await page.reload()
+  await skipFaceAsk(page)
   await page.getByRole('button', { name: 'Trocar foto de perfil' }).click()
   await expect(page.getByRole('radio', { name: 'raposa' })).toHaveAttribute('aria-checked', 'true')
+})
+
+test('a guest without a selfie is told once, on coming back, that they are not found in the photos', async ({ page }) => {
+  await fakeBackend(page)
+  await page.clock.install({ time: DURING })
+  await signUp(page)
+  const ask = page.getByRole('dialog', { name: 'Seu rosto não está sendo reconhecido' })
+  // not right after saying no at sign-up
+  await expect(page.getByRole('button', { name: 'Tirar foto' })).toBeVisible()
+  await expect(ask).toBeHidden()
+  await page.reload()
+  await expect(ask).toBeVisible({ timeout: 15_000 })
+  await ask.getByRole('button', { name: 'Ligar agora' }).click()
+  await expect(tab(page, 'Eu')).toHaveAttribute('aria-current', 'true')
+  await expect(page.getByRole('button', { name: 'Tirar selfie' })).toBeVisible()
+  // asked once only
+  await page.reload()
+  await expect(page.getByRole('button', { name: 'Tirar selfie' })).toBeVisible({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  await expect(ask).toBeHidden()
 })
