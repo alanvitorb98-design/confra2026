@@ -47,6 +47,8 @@ function note(step: string, e: unknown) {
   const why = e instanceof Error ? `${e.name}: ${e.message}` : ((e as { message?: string })?.message ?? String(e))
   db.rpc('log_client_error', { p_note: `${step}: ${why}`.slice(0, 300), p_ua: navigator.userAgent.slice(0, 200) }).then(() => undefined, () => undefined)
 }
+/** photos whose failed send was already told to the server in this session */
+const noted = new Set<string>()
 
 /** Asks the r2 function for a 10-minute link to put or get one original */
 async function r2Link(op: 'put' | 'get', path: string) {
@@ -1049,7 +1051,12 @@ export function useParty(me: Guest | null, peopleOn = false) {
         await up(thumbPath, thumbBlob, 'image/jpeg').catch(() => undefined)
       }
       // party photos also get a 1600px copy for the face server, deleted after it is read
-      if (row.kind === 'party') await up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', await lightCopy(file, 1600), 'image/jpeg').catch(() => undefined)
+      // (the copy is made inside the catch: a phone that can't redraw a big photo must not hold the photo back,
+      // the reader falls back to the 1080px copy)
+      if (row.kind === 'party')
+        await lightCopy(file, 1600)
+          .then((copy) => up(row.original_path.replace(/\.[^.]+$/, '') + '-f.jpg', copy, 'image/jpeg'))
+          .catch((e) => note('face copy', e))
       // the database notices the original isn't in its bucket
       const onR2 = await toR2(row.original_path, stored, storedType)
       if (onR2) row = { ...row, on_r2: true }
@@ -1085,6 +1092,11 @@ export function useParty(me: Guest | null, peopleOn = false) {
       setRows((m) => (m.has(row.id) ? m : new Map(m).set(row.id, { ...row, created_at: new Date().toISOString() })))
     } catch (e) {
       if (cancelled.current.has(row.id)) return
+      // once per photo and session, so a photo stuck on a phone shows up in client_errors
+      if (!noted.has(row.id)) {
+        noted.add(row.id)
+        note('send', e)
+      }
       // without a login every send is refused like a full space: that is not the photo's problem, it waits
       // and goes once the guest is back in
       const lasting = (await hasSession()) ? lastingProblem(e) : undefined
