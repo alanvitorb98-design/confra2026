@@ -18,6 +18,8 @@ export const EVENT = {
   facesOn: true,
   missionsOn: true,
   rankingOn: true,
+  /** swaps of the mission with people per guest (event_config.gen_swaps) */
+  swaps: 3,
 }
 
 /** The app opens one day before the party */
@@ -43,6 +45,7 @@ export interface EventConfig {
   faces_on?: boolean
   missions_on?: boolean
   ranking_on?: boolean
+  swaps?: number
   /** the server's clock when it answered */
   now?: string
 }
@@ -61,6 +64,7 @@ export function applyConfig(c: EventConfig, cache = true) {
   EVENT.facesOn = c.faces_on !== false
   EVENT.missionsOn = c.missions_on !== false
   EVENT.rankingOn = c.ranking_on !== false
+  if (typeof c.swaps === 'number') EVENT.swaps = c.swaps
   // the place only comes with the code: never forget it because a later answer came without
   if (c.place) {
     EVENT.place = c.place
