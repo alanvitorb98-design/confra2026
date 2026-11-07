@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { wrongKey } from '../push'
+import { wrongKey } from '../pushKey'
 
 const ours = Uint8Array.from([4, 1, 2, 3])
 

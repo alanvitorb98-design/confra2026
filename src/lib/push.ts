@@ -1,6 +1,7 @@
 import { db } from './backend'
 import { isInstalled } from './install'
 import { BRAND } from '../brand/brand'
+import { wrongKey } from './pushKey'
 
 // Countdown reminders. The server (edge function "lembrete", called every hour) decides what to send;
 // the phone only subscribes. The public half of the server's push key is the event's own (src/brand):
@@ -16,13 +17,6 @@ const key = () => {
   return Uint8Array.from(b, (c) => c.charCodeAt(0))
 }
 
-/** True when the subscription was made with another key. A browser that does not say gets the benefit of the doubt. */
-export function wrongKey(given: ArrayBuffer | null | undefined, ours: Uint8Array = key()) {
-  if (!given) return false
-  const a = new Uint8Array(given)
-  return a.length !== ours.length || a.some((b, i) => b !== ours[i])
-}
-
 async function subscription() {
   const reg = await navigator.serviceWorker.getRegistration()
   return reg ? reg.pushManager.getSubscription() : null
@@ -31,7 +25,7 @@ async function subscription() {
 /** This phone's subscription, made again when an old one used another key (it would never get a push). */
 async function mine(reg: ServiceWorkerRegistration) {
   const old = await reg.pushManager.getSubscription()
-  if (old && !wrongKey(old.options.applicationServerKey)) return old
+  if (old && !wrongKey(old.options.applicationServerKey, key())) return old
   if (old) {
     await db.rpc('drop_push', { p_endpoint: old.endpoint, p_auth: old.toJSON().keys?.auth })
     await old.unsubscribe()
@@ -75,7 +69,7 @@ export async function healPush() {
     if (!sub) return
     const reg = await navigator.serviceWorker.ready
     let fresh: PushSubscription
-    if (wrongKey(sub.options.applicationServerKey)) {
+    if (wrongKey(sub.options.applicationServerKey, key())) {
       // signed up with another key (an older version of the app): no push would ever arrive
       fresh = await mine(reg)
     } else {
