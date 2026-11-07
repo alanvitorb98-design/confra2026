@@ -165,6 +165,7 @@ main { padding: 18px 16px 0; max-width: 520px; margin: 0 auto; }
 .feed-bar { display: flex; justify-content: center; }
 .feed-bar.split { justify-content: space-between; gap: 10px; }
 .feed-bar .segmented { flex: 0 1 auto; }
+.feed-new { align-self: center; margin: 0 auto 6px; display: block; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; border: 0; background: var(--ink, #1c1a17); color: var(--paper, #fff); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18); cursor: pointer; }
 .feed-toggle.compact button, .wall-toggle button { padding: 0 12px; }
 .stack { position: relative; width: var(--w); justify-self: center; height: calc(var(--w) * 1.25 + 80px); margin-top: 4px; }
 .stack-card { position: absolute; inset: 0 0 auto 0; will-change: transform; }

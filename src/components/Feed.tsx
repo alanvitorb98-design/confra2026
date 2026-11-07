@@ -109,8 +109,11 @@ function Card({ photo, depth, burst, onFling, onTap }: CardProps) {
 
 /** Stack of Polaroids: fling the top one aside to see the next, double tap to react with 🔥. */
 export function Feed({ photos, onReact, onOpen, empty, header, onRetry, name = 'feed' }: Props) {
-  // follow the card on top by id, so photos arriving live from others don't move it
-  const [topId, setTopId] = useSessionState<string | undefined>(storageKey(`top.${name}`), undefined)
+  // follow the card on top by id, so photos arriving live from others don't move it; opening the feed always
+  // starts at the newest photo
+  const [topId, setTopId] = useState<string | undefined>(() => photos[0]?.id)
+  // the newest photo when the guest last went to the top: anything newer is offered with a "novas" button
+  const [seen, setSeen] = useState<string | undefined>(() => photos[0]?.id)
   const [burst, setBurst] = useState(0)
   const [view, setView] = useSessionState<'stack' | 'grid'>(storageKey(`view.${name}`), 'stack')
   const lastTap = useRef(0)
@@ -121,9 +124,24 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry, name = '
   const newest = photos[0]
   const mineNew = newest?.status === 'sending' ? newest.id : undefined
   useEffect(() => {
-    if (mineNew) setTopId(mineNew)
-  }, [mineNew, setTopId])
+    if (mineNew) {
+      setTopId(mineNew)
+      setSeen(mineNew)
+    }
+  }, [mineNew])
+  // the first photo to arrive in an empty feed goes on top and counts as seen
+  useEffect(() => {
+    if (!seen && newest) {
+      setSeen(newest.id)
+      setTopId(newest.id)
+    }
+  }, [seen, newest])
   const index = Math.max(0, photos.findIndex((p) => p.id === topId))
+  const fresh = Math.max(0, photos.findIndex((p) => p.id === seen))
+  const toNewest = () => {
+    setTopId(newest?.id)
+    setSeen(newest?.id)
+  }
   useEffect(() => () => clearTimeout(tapTimer.current), [])
 
   if (count === 0)
@@ -193,6 +211,11 @@ export function Feed({ photos, onReact, onOpen, empty, header, onRetry, name = '
   return (
     <div className="feed">
       {toggle}
+      {fresh > 0 && index !== 0 && (
+        <button className="feed-new" onClick={toNewest}>
+          {fresh === 1 ? '1 foto nova' : `${fresh} fotos novas`} ↑
+        </button>
+      )}
       <div className="stack">
         {photos.map((p, i) => {
           const depth = (i - (index % count) + count) % count
