@@ -777,7 +777,7 @@ begin
     'look_opens', c.look_opens, 'look_closes', c.look_closes, 'test_mode', c.test_mode,
     'place', c.place, 'address', c.address, 'maps_url', c.maps_url, 'lat', c.lat, 'lng', c.lng,
     'invite_only', c.invite_only, 'faces_on', c.faces_on, 'missions_on', c.missions_on,
-    'ranking_on', c.ranking_on, 'now', now()
+    'ranking_on', c.ranking_on, 'swaps', c.gen_swaps, 'now', now()
   );
 end $function$
 ;

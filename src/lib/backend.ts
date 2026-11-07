@@ -1,6 +1,6 @@
 import { createClient, isAuthRetryableFetchError } from '@supabase/supabase-js'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { applyConfig, now, serverSaid, type EventConfig } from './event'
+import { applyConfig, EVENT, now, serverSaid, type EventConfig } from './event'
 import { stripGps } from './exif'
 import * as outbox from './outbox'
 import { everyRow, photoId } from './ids'
@@ -533,9 +533,6 @@ function seeded(text: string) {
   return h >>> 0
 }
 
-/** swaps of people per guest on missions with people (the server's event_config.gen_swaps enforces it) */
-const PEOPLE_SWAPS = 3
-
 /** peopleOn: missions with people are running (the party is on) */
 export function useParty(me: Guest | null, peopleOn = false) {
   const [guests, setGuests] = useState<Map<string, string>>(new Map())
@@ -968,7 +965,7 @@ export function useParty(me: Guest | null, peopleOn = false) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id, peopleOn, peopleKey])
-  const people = { current: peopleOpen, done: peopleDone, need: peopleNeed, off: peopleOff, swapsLeft: Math.max(0, PEOPLE_SWAPS - swapsUsed) }
+  const people = { current: peopleOpen, done: peopleDone, need: peopleNeed, off: peopleOff, swapsLeft: Math.max(0, EVENT.swaps - swapsUsed) }
   const swapPeople = (id: string) => call<{ id: string }>('people_swap', { p_id: id })
 
   const hide = async (photoId: string) => {
