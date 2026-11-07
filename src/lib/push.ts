@@ -1,9 +1,11 @@
 import { db } from './backend'
 import { isInstalled } from './install'
+import { BRAND } from '../brand/brand'
 
 // Countdown reminders. The server (edge function "lembrete", called every hour) decides what to send;
-// the phone only subscribes. The public half of the server's push key:
-const VAPID = 'BI87pNcLKyENaK6h5SsoqBwoOTWFupvZSBaeQwt9HH7cc_GwVMz9jxom3BklJx5TQaCIKRHNQ0FJtw8U9IwTqkg'
+// the phone only subscribes. The public half of the server's push key is the event's own (src/brand):
+// a subscription made with another event's key is refused by the push service.
+const VAPID = BRAND.vapid
 
 export type PushState = 'unsupported' | 'install' | 'denied' | 'off' | 'on'
 
@@ -14,9 +16,27 @@ const key = () => {
   return Uint8Array.from(b, (c) => c.charCodeAt(0))
 }
 
+/** True when the subscription was made with another key. A browser that does not say gets the benefit of the doubt. */
+export function wrongKey(given: ArrayBuffer | null | undefined, ours: Uint8Array = key()) {
+  if (!given) return false
+  const a = new Uint8Array(given)
+  return a.length !== ours.length || a.some((b, i) => b !== ours[i])
+}
+
 async function subscription() {
   const reg = await navigator.serviceWorker.getRegistration()
   return reg ? reg.pushManager.getSubscription() : null
+}
+
+/** This phone's subscription, made again when an old one used another key (it would never get a push). */
+async function mine(reg: ServiceWorkerRegistration) {
+  const old = await reg.pushManager.getSubscription()
+  if (old && !wrongKey(old.options.applicationServerKey)) return old
+  if (old) {
+    await db.rpc('drop_push', { p_endpoint: old.endpoint, p_auth: old.toJSON().keys?.auth })
+    await old.unsubscribe()
+  }
+  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
 }
 
 export async function pushState(): Promise<PushState> {
@@ -34,7 +54,7 @@ export async function enablePush(code: string): Promise<PushState> {
   const answer = await Notification.requestPermission()
   if (answer !== 'granted') return answer === 'denied' ? 'denied' : 'off'
   const reg = await navigator.serviceWorker.ready
-  const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() }))
+  const sub = await mine(reg)
   const j = sub.toJSON()
   const { data, error } = await db.rpc('save_push', { p_code: code, p_endpoint: sub.endpoint, p_p256dh: j.keys?.p256dh, p_auth: j.keys?.auth })
   if (error || !data) {
@@ -53,13 +73,19 @@ export async function healPush() {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
     const sub = await subscription()
     if (!sub) return
-    const auth = sub.toJSON().keys?.auth
-    const { data: alive, error } = await db.rpc('push_alive', { p_endpoint: sub.endpoint, p_auth: auth })
-    // no answer (bad signal) is not "dropped": signing up again on every weak start piled up subscriptions
-    if (alive || error) return
-    await sub.unsubscribe()
     const reg = await navigator.serviceWorker.ready
-    const fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
+    let fresh: PushSubscription
+    if (wrongKey(sub.options.applicationServerKey)) {
+      // signed up with another key (an older version of the app): no push would ever arrive
+      fresh = await mine(reg)
+    } else {
+      const auth = sub.toJSON().keys?.auth
+      const { data: alive, error } = await db.rpc('push_alive', { p_endpoint: sub.endpoint, p_auth: auth })
+      // no answer (bad signal) is not "dropped": signing up again on every weak start piled up subscriptions
+      if (alive || error) return
+      await sub.unsubscribe()
+      fresh = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key() })
+    }
     const j = fresh.toJSON()
     await db.rpc('save_push', { p_code: '', p_endpoint: fresh.endpoint, p_p256dh: j.keys?.p256dh, p_auth: j.keys?.auth })
   } catch {
