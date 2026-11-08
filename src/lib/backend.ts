@@ -1173,10 +1173,14 @@ export function useParty(me: Guest | null, peopleOn = false) {
     }
     const l: Local = { file, url: URL.createObjectURL(file), preview, row, status: 'sending' }
     // kept on the phone first, so the photo survives the app closing before it is sent
-    const kept = fetch(preview)
-      .then((r) => r.blob())
-      .then((blob) => outbox.keep({ id, guest: me.id, row, file, fileName: file.name, preview: blob, at: Date.now() }))
-      .catch(() => false)
+    const kept = Promise.race([
+      fetch(preview)
+        .then((r) => r.blob())
+        .then((blob) => outbox.keep({ id, guest: me.id, row, file, fileName: file.name, preview: blob, at: Date.now() }))
+        .catch(() => false),
+      // whatever step hangs on the phone, the photo still goes out
+      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), outbox.WAIT_MS)),
+    ])
     void kept.then((ok) => {
       // the phone could not hold it (full or private mode): if this send fails, closing the app loses it
       if (!ok) note('outbox', new Error('não guardou no celular'))
